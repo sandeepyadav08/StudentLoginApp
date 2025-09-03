@@ -98,7 +98,11 @@ export default function DashboardScreen({ navigation }) {
 
   const handleDrawerItemPress = (item) => {
     toggleDrawer();
-    Alert.alert('Navigation', `Navigate to ${item}`);
+    if (item === 'Helpdesk') {
+      navigation.navigate('HelpdeskForm');
+    } else {
+      Alert.alert('Navigation', `Navigate to ${item}`);
+    }
   };
 
   const handleLogout = async () => {
