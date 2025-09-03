@@ -1,111 +1,158 @@
-// Mock dashboard data API service
-const API_BASE_URL = 'https://api.example.com'; // Replace with actual API URL
+// Real dashboard data API service
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// Simulate API delay
-const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+const API_BASE_URL = "http://192.168.29.217/iimt-application/api/portal";
 
-// Mock data that simulates real-time counts
-let mockData = {
-  grievance: Math.floor(Math.random() * 50) + 10, // Random between 10-59
-  ticket: Math.floor(Math.random() * 30) + 5,     // Random between 5-34
-  utility: Math.floor(Math.random() * 20) + 8,    // Random between 8-27
-  subscriptions: {
-    gym: { 
-      endDate: '2025-12-31',
-      status: 'active'
-    },
-    swimming: { 
-      endDate: '2025-11-15',
-      status: 'active'
-    }
-  },
-  lastUpdated: new Date().toISOString()
-};
-
-// Simulate data changes over time (like real API would provide)
-const updateMockData = () => {
-  const change = Math.random() > 0.5 ? 1 : -1;
-  
-  mockData.grievance = Math.max(0, mockData.grievance + change);
-  mockData.ticket = Math.max(0, mockData.ticket + (Math.random() > 0.7 ? change : 0));
-  mockData.utility = Math.max(0, mockData.utility + (Math.random() > 0.8 ? change : 0));
-  mockData.lastUpdated = new Date().toISOString();
-};
-
-// Update mock data every 30 seconds to simulate real-time changes
-setInterval(updateMockData, 30000);
-
-/**
- * Fetch dashboard statistics data
- * @returns {Promise<Object>} Dashboard data including counts and subscription info
- */
-export const getDashboardData = async () => {
+// Helper function to get auth token
+const getAuthToken = async () => {
   try {
-    // Simulate network delay
-    await delay(500 + Math.random() * 1000);
-    
-    // Simulate occasional API failure (5% chance)
-    if (Math.random() < 0.05) {
-      throw new Error('Network error: Unable to fetch dashboard data');
-    }
-    
-    // In a real app, this would be an actual API call:
-    // const response = await fetch(`${API_BASE_URL}/dashboard/stats`, {
-    //   method: 'GET',
-    //   headers: {
-    //     'Authorization': `Bearer ${userToken}`,
-    //     'Content-Type': 'application/json',
-    //   },
-    // });
-    // 
-    // if (!response.ok) {
-    //   throw new Error(`HTTP error! status: ${response.status}`);
-    // }
-    // 
-    // const data = await response.json();
-    // return data;
-    
-    // For now, return mock data
-    return {
-      ...mockData,
-      success: true,
-      message: 'Dashboard data loaded successfully'
-    };
-    
+    const token = await AsyncStorage.getItem("userToken");
+    return token;
   } catch (error) {
-    console.error('Error fetching dashboard data:', error);
-    throw new Error(error.message || 'Failed to load dashboard data');
+    console.error("Error getting auth token:", error);
+    return null;
+  }
+};
+
+// Helper function to format date
+const formatDate = (dateString) => {
+  if (!dateString) return "N/A";
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString("en-GB"); // DD/MM/YYYY format
+  } catch (error) {
+    return dateString;
   }
 };
 
 /**
- * Refresh specific metric data
+ * Fetch dashboard statistics data from real API
+ * @returns {Promise<Object>} Dashboard data including counts and subscription info
+ */
+export const getDashboardData = async () => {
+  try {
+    const token = await getAuthToken();
+
+    if (!token) {
+      throw new Error("Authentication token not found");
+    }
+
+    const response = await fetch(`${API_BASE_URL}/active-membership`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({}), // Empty body as per API requirement
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    if (data.status !== 200) {
+      throw new Error(data.message || "API returned error status");
+    }
+
+    // Process subscription utilities from API response
+    const subscriptions = {};
+
+    if (data.res && Array.isArray(data.res)) {
+      data.res.forEach((item) => {
+        try {
+          const utilityDetails = JSON.parse(item.utility_details);
+          const subscriptionKey = item.name.toLowerCase().replace(/\s+/g, "_");
+
+          subscriptions[subscriptionKey] = {
+            id: item.id,
+            name: item.name,
+            endDate: formatDate(item.end_date),
+            startDate: formatDate(item.start_date),
+            amount: item.amount,
+            status: item.payment_status === "1" ? "active" : "inactive",
+            paymentStatus: item.payment_status,
+            months: utilityDetails.months || "N/A",
+            subUtility: utilityDetails.sub_utility || "N/A",
+            membershipType: utilityDetails.membership_type || "N/A",
+            remark: item.remark,
+            createdOn: formatDate(item.created_on),
+            editedOn: formatDate(item.edited_on),
+          };
+        } catch (parseError) {
+          console.warn(
+            "Error parsing utility details for item:",
+            item.id,
+            parseError
+          );
+          // Fallback for items with parsing issues
+          const subscriptionKey = `utility_${item.id}`;
+          subscriptions[subscriptionKey] = {
+            id: item.id,
+            name: item.name || "Unknown Utility",
+            endDate: formatDate(item.end_date),
+            startDate: formatDate(item.start_date),
+            amount: item.amount,
+            status: item.payment_status === "1" ? "active" : "inactive",
+            paymentStatus: item.payment_status,
+          };
+        }
+      });
+    }
+
+    return {
+      grievance: data.grievance || 0,
+      ticket: data.tickets || 0,
+      utility: data.active_utility || 0,
+      subscriptions: subscriptions,
+      success: true,
+      message: data.message || "Dashboard data loaded successfully",
+      lastUpdated: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error("Error fetching dashboard data:", error);
+
+    // Return fallback data in case of error
+    return {
+      grievance: 0,
+      ticket: 0,
+      utility: 0,
+      subscriptions: {
+        fallback: {
+          name: "No Active Subscriptions",
+          endDate: "N/A",
+          status: "inactive",
+        },
+      },
+      success: false,
+      message: error.message || "Failed to load dashboard data",
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+};
+
+/**
+ * Refresh specific metric data by calling the API again
  * @param {string} metric - The metric to refresh ('grievance', 'ticket', 'utility', 'all')
  * @returns {Promise<Object>} Updated data for the specified metric
  */
-export const refreshMetricData = async (metric = 'all') => {
+export const refreshMetricData = async (metric = "all") => {
   try {
-    await delay(300);
-    
-    if (metric === 'all') {
-      updateMockData();
-      return getDashboardData();
+    // For real API, we just fetch fresh data
+    const freshData = await getDashboardData();
+
+    if (metric === "all") {
+      return freshData;
     }
-    
-    // Refresh specific metric
-    const change = Math.floor(Math.random() * 3) - 1; // -1, 0, or 1
-    if (mockData[metric] !== undefined) {
-      mockData[metric] = Math.max(0, mockData[metric] + change);
-      mockData.lastUpdated = new Date().toISOString();
-    }
-    
+
+    // Return specific metric data
     return {
-      [metric]: mockData[metric],
-      lastUpdated: mockData.lastUpdated,
-      success: true,
-      message: `${metric} data refreshed successfully`
+      [metric]: freshData[metric],
+      lastUpdated: freshData.lastUpdated,
+      success: freshData.success,
+      message: `${metric} data refreshed successfully`,
     };
-    
   } catch (error) {
     console.error(`Error refreshing ${metric} data:`, error);
     throw new Error(`Failed to refresh ${metric} data`);
@@ -113,34 +160,51 @@ export const refreshMetricData = async (metric = 'all') => {
 };
 
 /**
- * Get subscription utilities information
+ * Get subscription utilities information from API
  * @returns {Promise<Object>} Subscription data with end dates and status
  */
 export const getSubscriptionData = async () => {
   try {
-    await delay(200);
-    
-    // In a real app, this would fetch from actual API
+    const dashboardData = await getDashboardData();
     const currentDate = new Date();
-    const subscriptions = { ...mockData.subscriptions };
-    
+    const subscriptions = { ...dashboardData.subscriptions };
+
     // Add calculated fields like days remaining
-    Object.keys(subscriptions).forEach(key => {
-      const endDate = new Date(subscriptions[key].endDate);
-      const daysRemaining = Math.ceil((endDate - currentDate) / (1000 * 60 * 60 * 24));
-      subscriptions[key].daysRemaining = daysRemaining;
-      subscriptions[key].isExpiringSoon = daysRemaining <= 30;
+    Object.keys(subscriptions).forEach((key) => {
+      try {
+        const endDate = new Date(subscriptions[key].endDate);
+        if (!isNaN(endDate.getTime())) {
+          const daysRemaining = Math.ceil(
+            (endDate - currentDate) / (1000 * 60 * 60 * 24)
+          );
+          subscriptions[key].daysRemaining = daysRemaining;
+          subscriptions[key].isExpiringSoon = daysRemaining <= 30;
+          subscriptions[key].isExpired = daysRemaining < 0;
+        } else {
+          subscriptions[key].daysRemaining = 0;
+          subscriptions[key].isExpiringSoon = false;
+          subscriptions[key].isExpired = true;
+        }
+      } catch (dateError) {
+        console.warn(
+          "Error calculating days for subscription:",
+          key,
+          dateError
+        );
+        subscriptions[key].daysRemaining = 0;
+        subscriptions[key].isExpiringSoon = false;
+        subscriptions[key].isExpired = true;
+      }
     });
-    
+
     return {
       subscriptions,
-      success: true,
-      message: 'Subscription data loaded successfully'
+      success: dashboardData.success,
+      message: "Subscription data loaded successfully",
     };
-    
   } catch (error) {
-    console.error('Error fetching subscription data:', error);
-    throw new Error('Failed to load subscription data');
+    console.error("Error fetching subscription data:", error);
+    throw new Error("Failed to load subscription data");
   }
 };
 
@@ -150,27 +214,24 @@ export const getSubscriptionData = async () => {
  * @param {Object} requestData - The request details
  * @returns {Promise<Object>} Response with success status
  */
-export const submitRequest = async (type, requestData) => {
+export const submitRequest = async (type, requestData = {}) => {
   try {
-    await delay(800);
-    
-    // Simulate processing
-    if (Math.random() < 0.1) {
-      throw new Error('Server temporarily unavailable');
+    const token = await getAuthToken();
+
+    if (!token) {
+      throw new Error("Authentication token not found");
     }
-    
-    // Increment the count for the submitted type
-    if (mockData[type] !== undefined) {
-      mockData[type] += 1;
-    }
-    
+
+    // This would be implemented based on your specific API endpoints for submissions
+    // For now, return a success response
     return {
       success: true,
       message: `${type} submitted successfully`,
-      requestId: `REQ-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-      submittedAt: new Date().toISOString()
+      requestId: `REQ-${Date.now()}-${Math.random()
+        .toString(36)
+        .substring(2, 9)}`,
+      submittedAt: new Date().toISOString(),
     };
-    
   } catch (error) {
     console.error(`Error submitting ${type}:`, error);
     throw new Error(`Failed to submit ${type}`);
@@ -178,43 +239,43 @@ export const submitRequest = async (type, requestData) => {
 };
 
 /**
- * Get real-time updates for dashboard metrics
- * This would typically use WebSocket or Server-Sent Events in a real app
+ * Get real-time updates for dashboard metrics by polling the API
  * @param {Function} callback - Callback function to handle updates
  * @returns {Function} Cleanup function to stop listening for updates
  */
 export const subscribeToUpdates = (callback) => {
-  const interval = setInterval(() => {
-    // Simulate occasional updates
-    if (Math.random() < 0.3) {
-      updateMockData();
-      callback(mockData);
+  const interval = setInterval(async () => {
+    try {
+      const freshData = await getDashboardData();
+      callback(freshData);
+    } catch (error) {
+      console.error("Error in subscription update:", error);
     }
-  }, 5000); // Check for updates every 5 seconds
-  
+  }, 30000); // Poll every 30 seconds
+
   // Return cleanup function
   return () => clearInterval(interval);
 };
 
-// Export mock data for testing purposes
-export const getMockData = () => ({ ...mockData });
-
-// Reset mock data to initial state
-export const resetMockData = () => {
-  mockData = {
-    grievance: Math.floor(Math.random() * 50) + 10,
-    ticket: Math.floor(Math.random() * 30) + 5,
-    utility: Math.floor(Math.random() * 20) + 8,
-    subscriptions: {
-      gym: { 
-        endDate: '2025-12-31',
-        status: 'active'
-      },
-      swimming: { 
-        endDate: '2025-11-15',
-        status: 'active'
-      }
-    },
-    lastUpdated: new Date().toISOString()
-  };
+/**
+ * Test API connection
+ * @returns {Promise<Object>} Connection test result
+ */
+export const testApiConnection = async () => {
+  try {
+    const data = await getDashboardData();
+    return {
+      success: data.success,
+      message: data.success
+        ? "API connection successful"
+        : "API returned error",
+      data: data,
+    };
+  } catch (error) {
+    return {
+      success: false,
+      message: `API connection failed: ${error.message}`,
+      error: error.message,
+    };
+  }
 };

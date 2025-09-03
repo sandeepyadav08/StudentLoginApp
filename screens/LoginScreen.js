@@ -93,6 +93,9 @@ export default function LoginScreen({ navigation }) {
       
       console.log('User logged in:', response.user);
       console.log('Token stored successfully');
+      // ✅ Retrieve and log the token
+      const storedToken = await AsyncStorage.getItem('userToken');
+      console.log('Stored token is:', storedToken);
       
       // Navigate to Dashboard on successful login
       navigation.replace('Dashboard');

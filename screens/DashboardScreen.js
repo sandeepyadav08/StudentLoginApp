@@ -42,12 +42,11 @@ export default function DashboardScreen({ navigation }) {
     grievance: 0,
     ticket: 0,
     utility: 0,
-    subscriptions: {
-      gym: { endDate: '2025-12-31' },
-      swimming: { endDate: '2025-11-15' }
-    }
+    subscriptions: {}
   });
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [drawerAnimation] = useState(new Animated.Value(-width * 0.8));
 
@@ -57,10 +56,19 @@ export default function DashboardScreen({ navigation }) {
 
   const loadDashboardData = async () => {
     try {
+      setError(null);
       const data = await getDashboardData();
       setDashboardData(data);
+      
+      if (!data.success) {
+        setError(data.message || 'Failed to load some data');
+      }
     } catch (error) {
-      Alert.alert('Error', 'Failed to load dashboard data');
+      console.error('Dashboard load error:', error);
+      setError(error.message || 'Failed to load dashboard data');
+      Alert.alert('Error', 'Failed to load dashboard data. Please check your connection and try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -141,15 +149,52 @@ export default function DashboardScreen({ navigation }) {
     </View>
   );
 
-  const SubscriptionItem = ({ title, endDate }) => (
-    <View style={styles.subscriptionItem}>
-      <View style={styles.subscriptionLeft}>
-        <View style={styles.subscriptionIndicator} />
-        <Text style={[styles.subscriptionTitle, { fontSize: getResponsiveSize(16, screenWidth) }]}>{title}</Text>
+  const SubscriptionItem = ({ subscription }) => {
+    const isActive = subscription.status === 'active';
+    const isExpired = subscription.isExpired;
+    const isExpiringSoon = subscription.isExpiringSoon;
+    
+    let indicatorColor = '#16a34a'; // Green for active
+    if (isExpired) {
+      indicatorColor = '#dc2626'; // Red for expired
+    } else if (isExpiringSoon) {
+      indicatorColor = '#f59e0b'; // Yellow for expiring soon
+    }
+
+    return (
+      <View style={styles.subscriptionItem}>
+        <View style={styles.subscriptionLeft}>
+          <View style={[styles.subscriptionIndicator, { backgroundColor: indicatorColor }]} />
+          <View>
+            <Text style={[styles.subscriptionTitle, { fontSize: getResponsiveSize(16, screenWidth) }]}>
+              {subscription.name || 'Unknown Utility'}
+            </Text>
+            {subscription.amount && (
+              <Text style={[styles.subscriptionAmount, { fontSize: getResponsiveSize(12, screenWidth) }]}>
+                ₹{subscription.amount}
+              </Text>
+            )}
+          </View>
+        </View>
+        <View style={styles.subscriptionRight}>
+          <Text style={[styles.subscriptionEndDate, { fontSize: getResponsiveSize(14, screenWidth) }]}>
+            End: {subscription.endDate}
+          </Text>
+          {subscription.daysRemaining !== undefined && (
+            <Text style={[
+              styles.subscriptionDays, 
+              { 
+                fontSize: getResponsiveSize(12, screenWidth),
+                color: isExpired ? '#dc2626' : isExpiringSoon ? '#f59e0b' : '#16a34a'
+              }
+            ]}>
+              {isExpired ? 'Expired' : `${subscription.daysRemaining} days left`}
+            </Text>
+          )}
+        </View>
       </View>
-      <Text style={[styles.subscriptionEndDate, { fontSize: getResponsiveSize(14, screenWidth) }]}>End: {endDate}</Text>
-    </View>
-  );
+    );
+  };
 
   return (
     <SafeAreaView style={[styles.safeArea, { paddingTop: insets.top }]}>
@@ -183,6 +228,12 @@ export default function DashboardScreen({ navigation }) {
         }]}>
           <Text style={[styles.welcomeTitle, { fontSize: getResponsiveSize(24, screenWidth) }]}>Welcome, Student!</Text>
           <Text style={[styles.welcomeSubtitle, { fontSize: getResponsiveSize(14, screenWidth) }]}>Manage your college activities efficiently</Text>
+          {error && (
+            <View style={styles.errorContainer}>
+              <Ionicons name="warning-outline" size={16} color="#dc2626" />
+              <Text style={[styles.errorText, { fontSize: getResponsiveSize(12, screenWidth) }]}>{error}</Text>
+            </View>
+          )}
         </View>
 
         {/* Stats Cards */}
@@ -226,21 +277,40 @@ export default function DashboardScreen({ navigation }) {
         }]}>
           <View style={styles.sectionHeader}>
             <Text style={[styles.sectionTitle, { fontSize: getResponsiveSize(18, screenWidth) }]}>Subscription Utilities</Text>
-            <TouchableOpacity onPress={onRefresh}>
-              <Text style={[styles.refreshButton, { fontSize: getResponsiveSize(14, screenWidth) }]}>Refresh All</Text>
+            <TouchableOpacity onPress={onRefresh} disabled={refreshing}>
+              <Text style={[styles.refreshButton, { 
+                fontSize: getResponsiveSize(14, screenWidth),
+                opacity: refreshing ? 0.5 : 1
+              }]}>
+                {refreshing ? 'Refreshing...' : 'Refresh All'}
+              </Text>
             </TouchableOpacity>
           </View>
           
-          <View style={styles.subscriptionContainer}>
-            <SubscriptionItem
-              title="Gym"
-              endDate={dashboardData.subscriptions.gym.endDate}
-            />
-            <SubscriptionItem
-              title="Swimming"
-              endDate={dashboardData.subscriptions.swimming.endDate}
-            />
-          </View>
+          {loading && !refreshing ? (
+            <View style={styles.loadingContainer}>
+              <Text style={[styles.loadingText, { fontSize: getResponsiveSize(14, screenWidth) }]}>
+                Loading subscriptions...
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.subscriptionContainer}>
+              {Object.keys(dashboardData.subscriptions).length > 0 ? (
+                Object.entries(dashboardData.subscriptions).map(([key, subscription]) => (
+                  <SubscriptionItem
+                    key={key}
+                    subscription={subscription}
+                  />
+                ))
+              ) : (
+                <View style={styles.noSubscriptions}>
+                  <Text style={[styles.noSubscriptionsText, { fontSize: getResponsiveSize(14, screenWidth) }]}>
+                    {error ? 'Unable to load subscriptions' : 'No active subscriptions found'}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -449,9 +519,56 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#1f2937',
   },
+  subscriptionRight: {
+    alignItems: 'flex-end',
+  },
   subscriptionEndDate: {
     fontSize: 14,
     color: '#6b7280',
+  },
+  subscriptionAmount: {
+    fontSize: 12,
+    color: '#16a34a',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  subscriptionDays: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 2,
+  },
+  noSubscriptions: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  noSubscriptionsText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontStyle: 'italic',
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: 'rgba(220, 38, 38, 0.1)',
+    borderRadius: 6,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#dc2626',
+    marginLeft: 6,
+    flex: 1,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontStyle: 'italic',
   },
   bottomNavigation: {
     flexDirection: 'row',
