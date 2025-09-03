@@ -59,7 +59,6 @@ export default function DashboardScreen({ navigation }) {
       setError(null);
       const data = await getDashboardData();
       setDashboardData(data);
-      
       if (!data.success) {
         setError(data.message || 'Failed to load some data');
       }

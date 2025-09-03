@@ -60,12 +60,12 @@ export const getDashboardData = async () => {
     const subscriptions = {};
 
     if (data.res && Array.isArray(data.res)) {
-      data.res.forEach((item) => {
+      data.res.forEach((item,index) => {
+        
         try {
           const utilityDetails = JSON.parse(item.utility_details);
-          const subscriptionKey = item.name.toLowerCase().replace(/\s+/g, "_");
 
-          subscriptions[subscriptionKey] = {
+          subscriptions[index] = {
             id: item.id,
             name: item.name,
             endDate: formatDate(item.end_date),
