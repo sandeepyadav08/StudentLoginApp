@@ -20,20 +20,23 @@ const HelpdeskFormScreen = ({ navigation }) => {
   const [mainCategory, setMainCategory] = useState("");
   const [subCategory, setSubCategory] = useState("");
   const [availableDate, setAvailableDate] = useState(new Date());
-  const [availableTime, setAvailableTime] = useState(new Date());
+  const [availableTimeFrom, setAvailableTimeFrom] = useState(new Date());
+  const [availableTimeTo, setAvailableTimeTo] = useState(new Date());
   const [notes, setNotes] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [errors, setErrors] = useState({});
   const [showMainCategoryPicker, setShowMainCategoryPicker] = useState(false);
   const [showSubCategoryPicker, setShowSubCategoryPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showTimePicker, setShowTimePicker] = useState(false);
+  const [showTimeFromPicker, setShowTimeFromPicker] = useState(false);
+  const [showTimeToPicker, setShowTimeToPicker] = useState(false);
 
   const mainCategories = [
     { value: "hostel", text: "Hostel Issues" },
     { value: "it", text: "IT Infrastructure Issues" },
     { value: "food", text: "Food/Mess Issues" },
     { value: "admin", text: "Administration Issues" },
+    { value: "other", text: "Other" },
   ];
 
   const subCategories = {
@@ -83,10 +86,17 @@ const HelpdeskFormScreen = ({ navigation }) => {
     }
   };
 
-  const handleTimeChange = (event, selectedTime) => {
-    setShowTimePicker(false);
+  const handleTimeFromChange = (event, selectedTime) => {
+    setShowTimeFromPicker(false);
     if (selectedTime) {
-      setAvailableTime(selectedTime);
+      setAvailableTimeFrom(selectedTime);
+    }
+  };
+
+  const handleTimeToChange = (event, selectedTime) => {
+    setShowTimeToPicker(false);
+    if (selectedTime) {
+      setAvailableTimeTo(selectedTime);
     }
   };
 
@@ -130,7 +140,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
       newErrors.mainCategory = "Please select a main category";
     }
 
-    if (!subCategory) {
+    if (!subCategory && mainCategory !== "other") {
       newErrors.subCategory = "Please select a sub-category";
     }
 
@@ -157,7 +167,8 @@ const HelpdeskFormScreen = ({ navigation }) => {
           setMainCategory("");
           setSubCategory("");
           setAvailableDate(new Date());
-          setAvailableTime(new Date());
+          setAvailableTimeFrom(new Date());
+          setAvailableTimeTo(new Date());
           setNotes("");
           setSelectedFile(null);
           setErrors({});
@@ -211,39 +222,50 @@ const HelpdeskFormScreen = ({ navigation }) => {
           </View>
 
           {/* Sub-Category Selection */}
-          <View style={styles.categorySection}>
-            <Text style={styles.label}>Select Sub-Category *</Text>
-            <TouchableOpacity
-              style={[
-                styles.pickerButton,
-                !mainCategory && styles.disabledButton,
-              ]}
-              onPress={() => mainCategory && setShowSubCategoryPicker(true)}
-              disabled={!mainCategory}
-            >
-              <Text
+          {mainCategory !== "other" && (
+            <View style={styles.categorySection}>
+              <Text style={styles.label}>Select Sub-Category *</Text>
+              <TouchableOpacity
                 style={[
-                  styles.pickerText,
-                  !subCategory && styles.placeholderText,
+                  styles.pickerButton,
+                  (!mainCategory || mainCategory === "other") &&
+                    styles.disabledButton,
                 ]}
+                onPress={() =>
+                  mainCategory &&
+                  mainCategory !== "other" &&
+                  setShowSubCategoryPicker(true)
+                }
+                disabled={!mainCategory || mainCategory === "other"}
               >
-                {mainCategory
-                  ? getCategoryText(
-                      subCategory,
-                      subCategories[mainCategory] || []
-                    )
-                  : "Choose main category first"}
-              </Text>
-              <Ionicons
-                name="chevron-down"
-                size={20}
-                color={mainCategory ? "#8b5cf6" : "#ccc"}
-              />
-            </TouchableOpacity>
-            {errors.subCategory && (
-              <Text style={styles.errorText}>{errors.subCategory}</Text>
-            )}
-          </View>
+                <Text
+                  style={[
+                    styles.pickerText,
+                    !subCategory && styles.placeholderText,
+                  ]}
+                >
+                  {mainCategory && mainCategory !== "other"
+                    ? getCategoryText(
+                        subCategory,
+                        subCategories[mainCategory] || []
+                      )
+                    : "Choose main category first"}
+                </Text>
+                <Ionicons
+                  name="chevron-down"
+                  size={20}
+                  color={
+                    mainCategory && mainCategory !== "other"
+                      ? "#8b5cf6"
+                      : "#ccc"
+                  }
+                />
+              </TouchableOpacity>
+              {errors.subCategory && (
+                <Text style={styles.errorText}>{errors.subCategory}</Text>
+              )}
+            </View>
+          )}
 
           {/* Date and Time Selection */}
           <View style={styles.categorySection}>
@@ -259,17 +281,35 @@ const HelpdeskFormScreen = ({ navigation }) => {
             </TouchableOpacity>
 
             <Text style={[styles.label, { marginTop: 16 }]}>
-              Available Time (HH:MM AM/PM)
+              Available Time Range
             </Text>
-            <TouchableOpacity
-              style={styles.dateTimeButton}
-              onPress={() => setShowTimePicker(true)}
-            >
-              <Text style={styles.dateTimeText}>
-                {formatTime(availableTime)}
-              </Text>
-              <Ionicons name="time-outline" size={20} color="#8b5cf6" />
-            </TouchableOpacity>
+            <View style={styles.timeRangeContainer}>
+              <View style={styles.timeInputContainer}>
+                <Text style={styles.timeLabel}>From:</Text>
+                <TouchableOpacity
+                  style={styles.timeButton}
+                  onPress={() => setShowTimeFromPicker(true)}
+                >
+                  <Text style={styles.dateTimeText}>
+                    {formatTime(availableTimeFrom)}
+                  </Text>
+                  <Ionicons name="time-outline" size={16} color="#8b5cf6" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.timeInputContainer}>
+                <Text style={styles.timeLabel}>To:</Text>
+                <TouchableOpacity
+                  style={styles.timeButton}
+                  onPress={() => setShowTimeToPicker(true)}
+                >
+                  <Text style={styles.dateTimeText}>
+                    {formatTime(availableTimeTo)}
+                  </Text>
+                  <Ionicons name="time-outline" size={16} color="#8b5cf6" />
+                </TouchableOpacity>
+              </View>
+            </View>
           </View>
 
           {/* Notes Section */}
@@ -318,7 +358,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
 
           {/* Submit Button */}
           <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-            <Text style={styles.submitButtonText}>Submit Complaint</Text>
+            <Text style={styles.submitButtonText}>Submit Ticket </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -348,7 +388,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
       )}
 
       {/* Sub Category Picker Modal */}
-      {showSubCategoryPicker && mainCategory && (
+      {showSubCategoryPicker && mainCategory && mainCategory !== "other" && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Select Sub-Category</Text>
@@ -384,13 +424,23 @@ const HelpdeskFormScreen = ({ navigation }) => {
         />
       )}
 
-      {/* Time Picker */}
-      {showTimePicker && (
+      {/* Time From Picker */}
+      {showTimeFromPicker && (
         <DateTimePicker
-          value={availableTime}
+          value={availableTimeFrom}
           mode="time"
           display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={handleTimeChange}
+          onChange={handleTimeFromChange}
+        />
+      )}
+
+      {/* Time To Picker */}
+      {showTimeToPicker && (
+        <DateTimePicker
+          value={availableTimeTo}
+          mode="time"
+          display={Platform.OS === "ios" ? "spinner" : "default"}
+          onChange={handleTimeToChange}
         />
       )}
     </SafeAreaView>
@@ -597,6 +647,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#8b5cf6",
     fontWeight: "600",
+  },
+  timeRangeContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  timeInputContainer: {
+    flex: 1,
+  },
+  timeLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#6b21a8",
+    marginBottom: 4,
+  },
+  timeButton: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "#d8b4fe",
+    borderRadius: 8,
+    backgroundColor: "#fff",
   },
 });
 
