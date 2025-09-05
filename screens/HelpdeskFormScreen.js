@@ -9,11 +9,14 @@ import {
   Alert,
   TextInput,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as DocumentPicker from "expo-document-picker";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { uploadFileAPI, deleteFileAPI, saveTicketAPI } from "../services/api";
 
 const HelpdeskFormScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -24,6 +27,11 @@ const HelpdeskFormScreen = ({ navigation }) => {
   const [availableTimeTo, setAvailableTimeTo] = useState(new Date());
   const [notes, setNotes] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
+  const [originalFileName, setOriginalFileName] = useState(null);
+  const [uploadedFileName, setUploadedFileName] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   const [showMainCategoryPicker, setShowMainCategoryPicker] = useState(false);
   const [showSubCategoryPicker, setShowSubCategoryPicker] = useState(false);
@@ -32,37 +40,37 @@ const HelpdeskFormScreen = ({ navigation }) => {
   const [showTimeToPicker, setShowTimeToPicker] = useState(false);
 
   const mainCategories = [
-    { value: "hostel", text: "Hostel Issues" },
-    { value: "it", text: "IT Infrastructure Issues" },
-    { value: "food", text: "Food/Mess Issues" },
-    { value: "admin", text: "Administration Issues" },
-    { value: "other", text: "Other" },
+    { id: 1, value: "hostel", text: "Hostel Issues" },
+    { id: 2, value: "it", text: "IT Infrastructure Issues" },
+    { id: 3, value: "food", text: "Food/Mess Issues" },
+    { id: 4, value: "admin", text: "Administration Issues" },
+    { id: 5, value: "other", text: "Other" },
   ];
 
   const subCategories = {
     hostel: [
-      { value: "furniture", text: "Furniture" },
-      { value: "plumbing", text: "Plumbing" },
-      { value: "electricity", text: "Electricity" },
-      { value: "miscellaneous", text: "Miscellaneous" },
+      { id: 11, value: "furniture", text: "Furniture" },
+      { id: 12, value: "plumbing", text: "Plumbing" },
+      { id: 13, value: "electricity", text: "Electricity" },
+      { id: 14, value: "miscellaneous", text: "Miscellaneous" },
     ],
     it: [
-      { value: "wifi", text: "Wifi Issues" },
-      { value: "hardware", text: "Hardware" },
-      { value: "software", text: "Software" },
-      { value: "miscellaneous", text: "Miscellaneous" },
+      { id: 21, value: "wifi", text: "Wifi Issues" },
+      { id: 22, value: "hardware", text: "Hardware" },
+      { id: 23, value: "software", text: "Software" },
+      { id: 24, value: "miscellaneous", text: "Miscellaneous" },
     ],
     food: [
-      { value: "cooking", text: "Under/overcooked food" },
-      { value: "cleanliness", text: "Unclean dining area" },
-      { value: "hygiene", text: "Poor staff hygiene" },
-      { value: "miscellaneous", text: "Miscellaneous" },
+      { id: 31, value: "cooking", text: "Under/overcooked food" },
+      { id: 32, value: "cleanliness", text: "Unclean dining area" },
+      { id: 33, value: "hygiene", text: "Poor staff hygiene" },
+      { id: 34, value: "miscellaneous", text: "Miscellaneous" },
     ],
     admin: [
-      { value: "gate", text: "Entry point gate issue" },
-      { value: "sewage", text: "Sewerage Issues" },
-      { value: "classes", text: "Classes issues" },
-      { value: "miscellaneous", text: "Miscellaneous" },
+      { id: 41, value: "gate", text: "Entry point gate issue" },
+      { id: 42, value: "sewage", text: "Sewerage Issues" },
+      { id: 43, value: "classes", text: "Classes issues" },
+      { id: 44, value: "miscellaneous", text: "Miscellaneous" },
     ],
   };
 
@@ -112,12 +120,99 @@ const HelpdeskFormScreen = ({ navigation }) => {
         copyToCacheDirectory: true,
       });
 
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        setSelectedFile(result.assets[0]);
-        setErrors({ ...errors, file: "" });
-      }
+     if (!result.canceled && result.assets && result.assets.length > 0) {
+  const file = result.assets[0];
+  setSelectedFile(file);  // store as object, not JSON string
+  setOriginalFileName(file.name); // store original file name for UI display
+  setErrors({ ...errors, file: "" });
+
+  // Upload file to server
+  await uploadFileToServer(file);
+}
+
     } catch (error) {
       Alert.alert("Error", "Failed to pick file. Please try again.");
+    }
+  };
+
+  const uploadFileToServer = async (file) => {
+    try {
+      setIsUploading(true);
+
+      // Get token from AsyncStorage
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) {
+        Alert.alert(
+          "Error",
+          "Authentication token not found. Please login again."
+        );
+        return;
+      }
+
+     const response = await uploadFileAPI(file, token);
+
+      if (response.success) {
+        console.log('test',response.filename)
+        setUploadedFileName(response.filename);
+        // Alert.alert("Success", "File uploaded successfully!");
+      }
+    } catch (error) {
+      Alert.alert("Upload Error", error.message);
+      // Reset file selection on upload failure
+      setSelectedFile(null);
+      setOriginalFileName(null);
+      setUploadedFileName(null);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDeleteFile = () => {
+    Alert.alert("Delete File", "Are you sure you want to remove this file?", [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          await deleteFileFromServer();
+        },
+      },
+    ]);
+  };
+
+  const deleteFileFromServer = async () => {
+    try {
+      setIsDeleting(true);
+
+      // Get token from AsyncStorage
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) {
+        Alert.alert(
+          "Error",
+          "Authentication token not found. Please login again."
+        );
+        return;
+      }
+
+      if (uploadedFileName) {
+        const response = await deleteFileAPI(uploadedFileName, token);
+
+        if (response.success) {
+          Alert.alert("Success", "File deleted successfully!");
+        }
+      }
+
+      // Reset file states
+      setSelectedFile(null);
+      setOriginalFileName(null);
+      setUploadedFileName(null);
+    } catch (error) {
+      Alert.alert("Delete Error", error.message || "Failed to delete file");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -152,36 +247,110 @@ const HelpdeskFormScreen = ({ navigation }) => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateForm()) {
       Alert.alert("Error", "Please fill in all required fields");
       return;
     }
 
-    // Handle form submission here
-    Alert.alert("Success", "Your complaint has been submitted successfully!", [
-      {
-        text: "OK",
-        onPress: () => {
-          // Reset form
-          setMainCategory("");
-          setSubCategory("");
-          setAvailableDate(new Date());
-          setAvailableTimeFrom(new Date());
-          setAvailableTimeTo(new Date());
-          setNotes("");
-          setSelectedFile(null);
-          setErrors({});
-          // Navigate back
-          navigation.goBack();
-        },
-      },
-    ]);
+    try {
+      setIsSubmitting(true);
+
+      // Get token from AsyncStorage
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) {
+        Alert.alert(
+          "Error",
+          "Authentication token not found. Please login again."
+        );
+        return;
+      }
+
+      // Get category and subcategory IDs
+      const mainCategoryId = getCategoryId(mainCategory, mainCategories);
+      const subCategoryId = mainCategory === "other" ? null : getSubCategoryId(mainCategory, subCategory);
+
+      console.log('Category mapping:', {
+        mainCategoryText: mainCategory,
+        mainCategoryId: mainCategoryId,
+        subCategoryText: subCategory,
+        subCategoryId: subCategoryId
+      });
+
+      // Prepare ticket data with all required fields
+      const ticketData = {
+        category: mainCategoryId,
+        subCategory: subCategoryId || "",
+        description: notes,
+        docFile: uploadedFileName || "",
+        ticketId: "", // Empty for new tickets
+        // Date and time fields
+        availableDate: formatDate(availableDate),
+        availableTimeFrom: formatTime(availableTimeFrom),
+        availableTimeTo: formatTime(availableTimeTo),
+        startDate: formatDate(availableDate), // Use available date as start date
+        startTime: formatTime(availableTimeFrom), // Use available time from as start time
+        endTime: formatTime(availableTimeTo), // Use available time to as end time
+        // Additional fields that server might expect
+        time: formatTime(availableTimeFrom), // Main "time" parameter
+        date: formatDate(availableDate), // Main "date" parameter
+      };
+
+      const response = await saveTicketAPI(ticketData, token);
+
+      if (response.success) {
+        Alert.alert(
+          "Success",
+          "Your complaint has been submitted successfully!",
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                // Reset form
+                setMainCategory("");
+                setSubCategory("");
+                setAvailableDate(new Date());
+                setAvailableTimeFrom(new Date());
+                setAvailableTimeTo(new Date());
+                setNotes("");
+                setSelectedFile(null);
+                setOriginalFileName(null);
+                setUploadedFileName(null);
+                setErrors({});
+                // Navigate back
+                navigation.goBack();
+              },
+            },
+          ]
+        );
+      }
+    } catch (error) {
+      Alert.alert(
+        "Submission Error",
+        error.message || "Failed to submit ticket"
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const getCategoryText = (value, categories) => {
     const category = categories.find((cat) => cat.value === value);
     return category ? category.text : "Choose a category";
+  };
+
+  // Helper function to get category ID by value
+  const getCategoryId = (value, categories) => {
+    const category = categories.find((cat) => cat.value === value);
+    return category ? category.id : null;
+  };
+
+  // Helper function to get subcategory ID by value and main category
+  const getSubCategoryId = (mainCategoryValue, subCategoryValue) => {
+    const subCats = subCategories[mainCategoryValue];
+    if (!subCats) return null;
+    const subCategory = subCats.find((cat) => cat.value === subCategoryValue);
+    return subCategory ? subCategory.id : null;
   };
 
   return (
@@ -336,29 +505,93 @@ const HelpdeskFormScreen = ({ navigation }) => {
           {/* File Upload */}
           <View style={styles.categorySection}>
             <Text style={styles.label}>Upload File (Image or Document)</Text>
-            <TouchableOpacity
-              style={styles.fileButton}
-              onPress={handleFilePicker}
-            >
-              <View style={styles.fileButtonContent}>
-                <Text style={styles.fileButtonText}>
-                  {selectedFile
-                    ? `Selected: ${selectedFile.name}`
-                    : "Choose or drop a file here"}
-                </Text>
-                <Ionicons
-                  name="cloud-upload-outline"
-                  size={24}
-                  color="#8b5cf6"
-                />
+
+            {!selectedFile ? (
+              <TouchableOpacity
+                style={[
+                  styles.fileButton,
+                  isUploading && styles.disabledButton,
+                ]}
+                onPress={handleFilePicker}
+                disabled={isUploading}
+              >
+                <View style={styles.fileButtonContent}>
+                  <Text style={styles.fileButtonText}>
+                    {isUploading
+                      ? "Uploading..."
+                      : "Choose or drop a file here"}
+                  </Text>
+                  {isUploading ? (
+                    <ActivityIndicator size="small" color="#8b5cf6" />
+                  ) : (
+                    <Ionicons
+                      name="cloud-upload-outline"
+                      size={24}
+                      color="#8b5cf6"
+                    />
+                  )}
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <View style={styles.selectedFileContainer}>
+                <View style={styles.selectedFileInfo}>
+                  <Ionicons
+                    name="document-outline"
+                    size={20}
+                    color="#8b5cf6"
+                    style={styles.fileIcon}
+                  />
+                  <Text style={styles.selectedFileName} numberOfLines={1}>
+                    {originalFileName || selectedFile?.name || 'Unknown file'}
+                  </Text>
+                  <TouchableOpacity
+                    style={[
+                      styles.deleteFileButton,
+                      isDeleting && styles.disabledButton,
+                    ]}
+                    onPress={handleDeleteFile}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? (
+                      <ActivityIndicator size="small" color="#dc3545" />
+                    ) : (
+                      <Ionicons
+                        name="trash-outline"
+                        size={20}
+                        color="#dc3545"
+                      />
+                    )}
+                  </TouchableOpacity>
+                </View>
+                {uploadedFileName && (
+                  <Text style={styles.uploadStatusText}>
+                    ✓ Uploaded to server
+                  </Text>
+                )}
               </View>
-            </TouchableOpacity>
+            )}
+
             {errors.file && <Text style={styles.errorText}>{errors.file}</Text>}
           </View>
 
           {/* Submit Button */}
-          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-            <Text style={styles.submitButtonText}>Submit Ticket </Text>
+          <TouchableOpacity
+            style={[styles.submitButton, isSubmitting && styles.disabledButton]}
+            onPress={handleSubmit}
+            disabled={isSubmitting}
+          >
+            <View style={styles.submitButtonContent}>
+              {isSubmitting && (
+                <ActivityIndicator
+                  size="small"
+                  color="#fff"
+                  style={styles.submitLoader}
+                />
+              )}
+              <Text style={styles.submitButtonText}>
+                {isSubmitting ? "Submitting..." : "Submit Ticket"}
+              </Text>
+            </View>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -576,6 +809,40 @@ const styles = StyleSheet.create({
     color: "#8b5cf6",
     flex: 1,
   },
+  selectedFileContainer: {
+    borderWidth: 1,
+    borderColor: "#d8b4fe",
+    borderRadius: 8,
+    backgroundColor: "#fff",
+    padding: 12,
+  },
+  selectedFileInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  fileIcon: {
+    marginRight: 8,
+  },
+  selectedFileName: {
+    fontSize: 16,
+    color: "#6b21a8",
+    flex: 1,
+    fontWeight: "500",
+  },
+  deleteFileButton: {
+    padding: 8,
+    borderRadius: 6,
+    backgroundColor: "#fef2f2",
+    borderWidth: 1,
+    borderColor: "#fecaca",
+  },
+  uploadStatusText: {
+    fontSize: 12,
+    color: "#059669",
+    marginTop: 8,
+    fontWeight: "500",
+  },
   submitButton: {
     backgroundColor: "#8b5cf6",
     borderRadius: 25,
@@ -590,6 +857,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 8,
+  },
+  submitButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  submitLoader: {
+    marginRight: 8,
   },
   submitButtonText: {
     color: "#fff",

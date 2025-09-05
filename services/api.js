@@ -298,6 +298,271 @@ export const logoutAPI = async (token) => {
   }
 };
 
+// File Upload API
+export const uploadFileAPI = async (fileData, token) => {
+  try {
+    // const fileObj = JSON.parse(fileData);
+    // console.log('Parsed file object:', fileObj);
+    
+    const formData = new FormData();
+    
+    // Create proper React Native file object for FormData
+    // Use the exact format React Native expects
+    formData.append("Filedata", {
+      uri: fileData.uri,
+      type: fileData.mimeType || 'image/jpeg',
+      name: fileData.name
+    });
+    formData.append("location", "public/uploads/helpdesk-docs/");
+    formData.append("app_post", "");
+    formData.append("allow_ext", "jpg,jpeg,png");
+    formData.append("timestamp", '1756960111');
+    formData.append("token", '2c16b02e53f093adbfc002542a63b893'); // Add token as form parameter
+    formData.append("filename", 'helpdesk_file');
+    
+    console.log('Uploading file:', fileData.name, 'with token:', token?.substring(0, 20) + '...');
+
+    const response = await fetch(`${API_BASE_URL}/upload-file`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        // Don't set Content-Type header - let browser handle it for multipart/form-data
+      },
+      body: formData,
+    });
+
+    console.log('Upload response status:', response.status);
+    console.log('Upload response ok:', response.ok);
+    
+    const responseText = await response.text();
+    console.log('Upload response text:', responseText);
+    
+    let data;
+    
+    try {
+      data = JSON.parse(responseText);
+      console.log('Upload parsed response:', data);
+    } catch (parseError) {
+      console.error('Failed to parse response:', responseText);
+      throw new Error('Invalid server response: ' + responseText.slice(0, 100));
+    }
+
+    if (!response.ok || (data.status !== 201 && data.status !== 200)) {
+      throw new Error(data.message || data.error || "File upload failed");
+    }
+
+    return {
+      success: true,
+      message: data.message || "File uploaded successfully",
+      filename: data.filename ,
+      file:fileData.name
+  
+    };
+  } catch (error) {
+    console.error('Upload error:', error);
+    throw {
+      success: false,
+      message: error.message || "Network error occurred",
+    };
+  }
+};
+
+
+// File Delete API - Simplified version with proper error handling
+export const deleteFileAPI = async (filename, token) => {
+  try {
+    if (!filename) {
+      throw new Error("Filename is required for deletion");
+    }
+    console.log(filename)
+    if (!token) {
+      throw new Error("Authentication token is required");
+    }
+    
+    const formData = new FormData();
+    formData.append("filename", filename);
+    
+    console.log('Deleting file:', filename);
+    console.log('Delete API endpoint:', `${API_BASE_URL}/delete-file`);
+
+    const response = await fetch(`${API_BASE_URL}/delete-file`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const responseText = await response.text();
+    console.log('Delete API response text:', responseText);
+    console.log('Delete API response status:', response.status);
+    
+    // Handle "No data Found" specifically - this is actually SUCCESS
+    // because it means the file doesn't exist (which is our goal)
+    if (responseText.toLowerCase().includes('no data found')) {
+      console.log('File not found on server - treating as successful deletion');
+      return {
+        success: true,
+        message: "File removed successfully (file was not found on server)",
+      };
+    }
+    
+    // Try to parse JSON response
+    let data;
+    try {
+      data = JSON.parse(responseText);
+      console.log('Delete API parsed response:', data);
+    } catch (parseError) {
+      // Handle plain text responses
+      if (response.ok && (responseText.toLowerCase().includes('success') || 
+                         responseText.toLowerCase().includes('deleted'))) {
+        return {
+          success: true,
+          message: responseText || "File deleted successfully",
+        };
+      }
+      
+      // If it's not a success response, treat it as an error
+      throw new Error(responseText || "Unknown server response");
+    }
+
+    // Handle JSON responses
+    if (response.ok || response.status === 200) {
+      // Check for "No data Found" in JSON response
+      if (data.message && data.message.toLowerCase().includes('no data found')) {
+        console.log('File not found in JSON response - treating as successful deletion');
+        return {
+          success: true,
+          message: "File removed successfully (file was not found on server)",
+        };
+      }
+      
+      return {
+        success: true,
+        message: data.message || "File deleted successfully",
+      };
+    }
+
+    // Handle error responses
+    throw new Error(data.message || data.error || "File deletion failed");
+    
+  } catch (error) {
+    console.error('Delete error:', error);
+    
+    // Special handling for "No data Found" errors - treat as success
+    if (error.message && error.message.toLowerCase().includes('no data found')) {
+      console.log('Caught "No data Found" error - treating as successful deletion');
+      return {
+        success: true,
+        message: "File removed successfully (file was not found on server)",
+      };
+    }
+    
+    // For all other errors, throw them
+    throw {
+      success: false,
+      message: error.message || "Network error occurred",
+    };
+  }
+};
+
+// Save Ticket API
+export const saveTicketAPI = async (ticketData, token) => {
+  try {
+    if (!token) {
+      throw new Error("Authentication token is required");
+    }
+    
+    const formData = new FormData();
+    formData.append("category", ticketData.category || "");
+    formData.append("sub_category", ticketData.subCategory || "");
+    formData.append("description", ticketData.description || "");
+    
+    // Always include doc_file parameter, even if empty
+    formData.append("doc_file", ticketData.docFile || "");
+    
+    // Add missing date/time parameters that server expects
+    formData.append("start_date", ticketData.startDate || "");
+    formData.append("start_time", ticketData.startTime || "");
+    formData.append("end_time", ticketData.endTime || "");
+    formData.append("available_date", ticketData.availableDate || "");
+    formData.append("available_time_from", ticketData.availableTimeFrom || "");
+    formData.append("available_time_to", ticketData.availableTimeTo || "");
+    
+    // Add comprehensive time/date parameters that server might expect
+    const timeValue = ticketData.time || ticketData.availableTimeFrom || "";
+    const dateValue = ticketData.date || ticketData.availableDate || "";
+    
+    formData.append("time", timeValue);
+    formData.append("date", dateValue);
+    formData.append("booking_time", timeValue);
+    formData.append("booking_date", dateValue);
+    formData.append("preferred_time", timeValue);
+    formData.append("preferred_date", dateValue);
+    formData.append("visit_time", timeValue);
+    formData.append("visit_date", dateValue);
+    
+    // Add common fields that servers often expect
+    formData.append("status", "open");
+    formData.append("priority", "normal");
+    formData.append("source", "mobile_app");
+    
+    // Use 'ticket_id' instead of 'ticketId' to match server expectations
+    formData.append("ticket_id", ticketData.ticketId || "");
+    
+    // Debug: Log all FormData entries
+    console.log('Saving ticket with data:', {
+      category: ticketData.category,
+      sub_category: ticketData.subCategory,
+      description: ticketData.description?.substring(0, 50),
+      doc_file: ticketData.docFile || 'none',
+      ticket_id: ticketData.ticketId || 'new',
+      time: timeValue,
+      date: dateValue
+    });
+    
+    // Debug: Log all FormData parameters being sent
+    console.log('All FormData parameters:');
+    for (let [key, value] of formData.entries()) {
+      console.log(`${key}: ${value}`);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/save-tickets`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const responseText = await response.text();
+    let data;
+    
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('Failed to parse save ticket response:', responseText);
+      throw new Error('Invalid server response: ' + responseText.slice(0, 100));
+    }
+
+    if (!response.ok || (data.status !== 201 && data.status !== 200)) {
+      throw new Error(data.message || data.error || "Failed to save ticket");
+    }
+
+    return {
+      success: true,
+      message: data.message || "Ticket saved successfully",
+      ticketId: data.ticketId || data.ticket_id || data.id,
+    };
+  } catch (error) {
+    console.error('Save ticket error:', error);
+    throw {
+      success: false,
+      message: error.message || "Network error occurred",
+    };
+  }
+};
+
 //// export const decodetoken = async () => {
 //   // Example JWT token (from your login API)
 //   const token =
