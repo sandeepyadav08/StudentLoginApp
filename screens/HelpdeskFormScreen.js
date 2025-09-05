@@ -519,7 +519,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
                   <Text style={styles.fileButtonText}>
                     {isUploading
                       ? "Uploading..."
-                      : "Choose or drop a file here"}
+                      : "Choose a file"}
                   </Text>
                   {isUploading ? (
                     <ActivityIndicator size="small" color="#8b5cf6" />
@@ -800,14 +800,16 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   fileButtonContent: {
-    flexDirection: "row",
+  flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "center", 
   },
   fileButtonText: {
     fontSize: 16,
     color: "#8b5cf6",
-    flex: 1,
+     textAlign: "center",
+      marginRight: 8, 
   },
   selectedFileContainer: {
     borderWidth: 1,
