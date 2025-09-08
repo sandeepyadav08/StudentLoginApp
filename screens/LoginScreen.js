@@ -75,36 +75,57 @@ export default function LoginScreen({ navigation }) {
   };
 
   // Handle login
-  const handleLogin = async () => {
-    if (!validateForm()) {
+ // Handle login
+const handleLogin = async () => {
+  if (!validateForm()) {
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    const response = await loginAPI(email.trim(), password);
+    console.log(response);
+
+    if (!response.success) {
+      Alert.alert(
+        'Error',
+        response.message,
+        [
+          {
+            text: 'OK',
+            onPress: () => setLoading(false), // ✅ Re-enable login button
+          },
+        ]
+      );
       return;
     }
 
-    setLoading(true);
-    try {
-      const response = await loginAPI(email.trim(), password);
-      
-      // Store token and user data
-      await AsyncStorage.setItem('userToken', response.token);
-      await AsyncStorage.setItem('userEmail', email.trim());
-      if (response.user) {
-        await AsyncStorage.setItem('userData', JSON.stringify(response.user));
-      }
-      
-      console.log('User logged in:', response.user);
-      console.log('Token stored successfully');
-      // ✅ Retrieve and log the token
-      const storedToken = await AsyncStorage.getItem('userToken');
-      console.log('Stored token is:', storedToken);
-      
-      // Navigate to Dashboard on successful login
-      navigation.replace('Dashboard');
-    } catch (error) {
-      Alert.alert('Error', error.message);
-    } finally {
-      setLoading(false);
+    // Store token and user data
+    await AsyncStorage.setItem('userToken', response.token);
+    await AsyncStorage.setItem('userEmail', email.trim());
+    if (response.user) {
+      await AsyncStorage.setItem('userData', JSON.stringify(response.user));
     }
-  };
+
+    console.log('User logged in:', response.user);
+    console.log('Token stored successfully');
+
+    const storedToken = await AsyncStorage.getItem('userToken');
+    console.log('Stored token is:', storedToken);
+
+    navigation.replace('Dashboard');
+  } catch (error) {
+    Alert.alert(
+      'Error',
+      'Something went wrong. Please try again.',
+      [
+        { text: 'OK', onPress: () => setLoading(false) } // ✅ Re-enable on error also
+      ]
+    );
+  }
+};
+
 
   // Clear error when user starts typing
   const handleEmailChange = (text) => {

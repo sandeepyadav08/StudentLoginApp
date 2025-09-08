@@ -30,6 +30,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
   const [originalFileName, setOriginalFileName] = useState(null);
   const [uploadedFileName, setUploadedFileName] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
@@ -122,6 +123,18 @@ const HelpdeskFormScreen = ({ navigation }) => {
 
      if (!result.canceled && result.assets && result.assets.length > 0) {
   const file = result.assets[0];
+  
+  // File size validation - 2MB limit
+  const maxSizeInBytes = 2 * 1024 * 1024; // 2MB in bytes
+  if (file.size && file.size > maxSizeInBytes) {
+    const fileSizeInMB = (file.size / (1024 * 1024)).toFixed(2);
+    Alert.alert(
+      "File Too Large", 
+      `The selected file is ${fileSizeInMB}MB. Please choose a file smaller than 2MB.`
+    );
+    return;
+  }
+  
   setSelectedFile(file);  // store as object, not JSON string
   setOriginalFileName(file.name); // store original file name for UI display
   setErrors({ ...errors, file: "" });
@@ -138,6 +151,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
   const uploadFileToServer = async (file) => {
     try {
       setIsUploading(true);
+      setUploadProgress(0);
 
       // Get token from AsyncStorage
       const token = await AsyncStorage.getItem("userToken");
@@ -149,12 +163,33 @@ const HelpdeskFormScreen = ({ navigation }) => {
         return;
       }
 
+      // Simulate upload progress
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => {
+          if (prev >= 90) {
+            clearInterval(progressInterval);
+            return 90; // Stop at 90% until actual upload completes
+          }
+          return Math.min(prev + Math.random() * 15, 90); // Gradual progress to 90%
+        });
+      }, 300);
+
      const response = await uploadFileAPI(file, token);
 
+      // Complete the progress
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      
+      // Small delay to show 100% completion
+      setTimeout(() => {
+        setUploadProgress(0);
+      }, 500);
+
       if (response.success) {
-        console.log('test',response.filename)
+        console.log('Upload completed:', response.filename);
         setUploadedFileName(response.filename);
-        // Alert.alert("Success", "File uploaded successfully!");
+        // Show success feedback briefly
+        Alert.alert("Success", "File uploaded successfully!");
       }
     } catch (error) {
       Alert.alert("Upload Error", error.message);
@@ -162,6 +197,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
       setSelectedFile(null);
       setOriginalFileName(null);
       setUploadedFileName(null);
+      setUploadProgress(0);
     } finally {
       setIsUploading(false);
     }
@@ -518,8 +554,8 @@ const HelpdeskFormScreen = ({ navigation }) => {
                 <View style={styles.fileButtonContent}>
                   <Text style={styles.fileButtonText}>
                     {isUploading
-                      ? "Uploading..."
-                      : "Choose a file"}
+                      ? `Uploading... ${Math.round(uploadProgress)}%`
+                      : "Choose a file (Max 2MB)"}
                   </Text>
                   {isUploading ? (
                     <ActivityIndicator size="small" color="#8b5cf6" />
@@ -531,6 +567,19 @@ const HelpdeskFormScreen = ({ navigation }) => {
                     />
                   )}
                 </View>
+                {/* Progress Bar */}
+                {isUploading && (
+                  <View style={styles.progressContainer}>
+                    <View style={styles.progressBar}>
+                      <View 
+                        style={[
+                          styles.progressFill, 
+                          { width: `${uploadProgress}%` }
+                        ]} 
+                      />
+                    </View>
+                  </View>
+                )}
               </TouchableOpacity>
             ) : (
               <View style={styles.selectedFileContainer}>
@@ -563,9 +612,18 @@ const HelpdeskFormScreen = ({ navigation }) => {
                     )}
                   </TouchableOpacity>
                 </View>
-                {uploadedFileName && (
+                {/* Upload Status */}
+                {isUploading && (
+                  <View style={styles.uploadingStatus}>
+                    <ActivityIndicator size="small" color="#8b5cf6" />
+                    <Text style={styles.uploadingStatusText}>
+                      Uploading... {Math.round(uploadProgress)}%
+                    </Text>
+                  </View>
+                )}
+                {!isUploading && uploadedFileName && (
                   <Text style={styles.uploadStatusText}>
-                    ✓ Uploaded to server
+                    ✓ Uploaded successfully
                   </Text>
                 )}
               </View>
@@ -798,18 +856,34 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     backgroundColor: "#faf5ff",
     padding: 16,
+    overflow: "hidden",
   },
   fileButtonContent: {
-  flexDirection: "row",
-    justifyContent: "space-between",
+    flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
-    justifyContent: "center", 
   },
   fileButtonText: {
     fontSize: 16,
     color: "#8b5cf6",
-     textAlign: "center",
-      marginRight: 8, 
+    textAlign: "center",
+    marginRight: 8,
+  },
+  progressContainer: {
+    marginTop: 12,
+    width: "100%",
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: "#e9d5ff",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: "100%",
+    backgroundColor: "#8b5cf6",
+    borderRadius: 3,
+    minWidth: 2,
   },
   selectedFileContainer: {
     borderWidth: 1,
@@ -843,6 +917,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#059669",
     marginTop: 8,
+    fontWeight: "500",
+  },
+  uploadingStatus: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  uploadingStatusText: {
+    fontSize: 12,
+    color: "#8b5cf6",
+    marginLeft: 8,
     fontWeight: "500",
   },
   submitButton: {
