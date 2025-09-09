@@ -20,6 +20,22 @@ const { width, height } = Dimensions.get('window');
 
 export default function ResetPasswordScreen({ navigation, route }) {
   const { email, otpToken, otpVerified } = route.params || {};
+  
+  // Security check - ensure user came from OTP verification
+  React.useEffect(() => {
+    if (!email || !otpToken || !otpVerified) {
+      Alert.alert(
+        'Access Denied',
+        'Please verify your OTP first to reset password.',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('ForgotPassword')
+          }
+        ]
+      );
+    }
+  }, [email, otpToken, otpVerified, navigation]);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -71,19 +87,35 @@ export default function ResetPasswordScreen({ navigation, route }) {
 
   // Handle password reset
   const handleResetPassword = async () => {
+    // Security check before proceeding
+    if (!email || !otpToken || !otpVerified) {
+      Alert.alert(
+        'Error',
+        'Invalid session. Please start over.',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('ForgotPassword')
+          }
+        ]
+      );
+      return;
+    }
+
     if (!validateForm()) {
       return;
     }
 
     setLoading(true);
     try {
-      // Import the verifyOtpAPI to do the final password reset
-      const { verifyOtpAPI } = require('../services/api');
-      const response = await verifyOtpAPI(email, otpToken, newPassword);
+      // Import the resetPasswordAPI - uses combined OTP verification and password update
+      const { resetPasswordAPI } = require('../services/api');
+      const response = await resetPasswordAPI(email, otpToken, newPassword);
       
+      // If we reach here, password reset was successful
       Alert.alert(
         'Password Reset Successful', 
-        'Your password has been reset successfully! You can now login with your new password.',
+        response.message || 'Your password has been reset successfully! You can now login with your new password.',
         [
           {
             text: 'Login Now',
@@ -92,6 +124,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
         ]
       );
     } catch (error) {
+      // Show only a user-friendly alert, avoid noisy console errors in production
       Alert.alert('Error', error.message || 'Failed to reset password. Please try again.');
     } finally {
       setLoading(false);

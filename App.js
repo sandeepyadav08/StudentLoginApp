@@ -4,7 +4,6 @@ import { createStackNavigator } from '@react-navigation/stack';
 import LoginScreen from './screens/LoginScreen';
 import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
 import OtpVerificationScreen from './screens/OtpVerificationScreen';
-import ResetPasswordScreen from './screens/ResetPasswordScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import DataTabNavigator from './screens/DataTabNavigator';
 import HelpdeskFormScreen from './screens/HelpdeskFormScreen';
@@ -31,10 +30,6 @@ export default function App() {
         <Stack.Screen 
           name="OtpVerification" 
           component={OtpVerificationScreen}
-        />
-        <Stack.Screen 
-          name="ResetPassword" 
-          component={ResetPasswordScreen}
         />
         <Stack.Screen 
           name="Dashboard" 

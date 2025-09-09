@@ -59,21 +59,121 @@ export const forgotPasswordAPI = async (email) => {
 
     const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data.message || "Failed to send reset OTP");
+    console.log("Forgot Password Response:", {
+      status: response.status,
+      ok: response.ok,
+      data: data,
+    });
+
+    if (!response.ok || (data.status !== 200 && data.status !== 201)) {
+      throw new Error(data.message || "User not found. Please check your email address.");
     }
 
     return {
       success: true,
-      message: data.message,
+      message: data.message || "OTP has been sent to your email",
       otpSent: true,
       email: email,
     };
   } catch (error) {
-    throw {
-      success: false,
-      message: error.message || "Network error occurred",
+    // Log at info level in development if needed
+    // console.log("Forgot Password Error:", error);
+    // Throw an Error object with the proper message
+    throw new Error(error.message || "User not found or network error occurred");
+  }
+};
+
+// OTP Verification and Password Update API (combined - server updates password during OTP verification)
+export const verifyOtpAndUpdatePasswordAPI = async (email, otp, newPassword) => {
+  try {
+    let formData = new FormData();
+    formData.append("otp", otp);
+    formData.append("email_id", email);
+    
+    // Include password fields - server updates password during OTP verification
+    if (newPassword) {
+      formData.append("password", newPassword);
+      formData.append("confirm_password", newPassword);
+    }
+
+    console.log("OTP Verification with Password Update Request:", {
+      url: `${API_BASE_URL}/otp-verify`,
+      email: email,
+      otp: otp,
+      hasPassword: !!newPassword,
+    });
+
+    const response = await fetch(`${API_BASE_URL}/otp-verify`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    console.log("OTP Verification with Password Update Response:", {
+      status: response.status,
+      ok: response.ok,
+      data: data,
+    });
+
+    if (!response.ok || (data.status !== 200 && data.status !== 201)) {
+      throw new Error(data.message || data.error || "Invalid OTP. Please try again.");
+    }
+
+    return {
+      success: true,
+      message: data.message || (newPassword ? "Password updated successfully" : "OTP verified successfully"),
+      email: email,
+      otp: otp,
+      passwordUpdated: !!newPassword,
     };
+  } catch (error) {
+    // console.log("OTP Verification Error:", error);
+    // Throw an Error object with the proper message
+    throw new Error(error.message || "Invalid OTP. Please try again.");
+  }
+};
+
+// OTP Verification Only API (just check if OTP is valid - for cases where we don't want to update password yet)
+export const verifyOtpOnlyAPI = async (email, otp) => {
+  try {
+    let formData = new FormData();
+    formData.append("otp", otp);
+    formData.append("email_id", email);
+
+    console.log("OTP Verification Only Request:", {
+      url: `${API_BASE_URL}/otp-verify`,
+      email: email,
+      otp: otp,
+    });
+
+    const response = await fetch(`${API_BASE_URL}/otp-verify`, {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+
+    console.log("OTP Verification Only Response:", {
+      status: response.status,
+      ok: response.ok,
+      data: data,
+    });
+
+    if (!response.ok || (data.status !== 200 && data.status !== 201)) {
+      throw new Error(data.message || data.error || "Invalid OTP. Please try again.");
+    }
+
+    return {
+      success: true,
+      message: data.message || "OTP verified successfully",
+      email: email,
+      otp: otp,
+    };
+  } catch (error) {
+    // console.log("OTP Verification Error:", error);
+    // Throw an Error object with the proper message
+    throw new Error(error.message || "Invalid OTP. Please try again.");
   }
 };
 
@@ -108,35 +208,32 @@ export const verifyOtpAPI = async (email, otp, newPassword = null) => {
       data: data,
     });
 
-    if (!response.ok || data.status !== 200) {
+    if (!response.ok || (data.status !== 200 && data.status !== 201)) {
       throw new Error(data.message || data.error || "OTP verification failed");
     }
 
     return {
       success: true,
-      message: data.message,
+      message: data.message || (newPassword ? "Password reset successfully" : "OTP verified successfully"),
       token: data.token || otp,
       email: email,
       isPasswordReset: !!newPassword,
     };
   } catch (error) {
-    console.error("OTP Verify Error:", error);
-    throw {
-      success: false,
-      message: error.message || "Network error occurred",
-    };
+    // console.log("OTP Verify Error:", error);
+    // Throw an Error object with the proper message
+    throw new Error(error.message || "Network error occurred");
   }
 };
 
-// Reset Password API (uses the same OTP verify endpoint with new password)
+// Password Reset API - wrapper around the combined OTP verification and password update
 export const resetPasswordAPI = async (email, otpToken, newPassword) => {
   try {
-    return await verifyOtpAPI(email, otpToken, newPassword);
+    // Use the combined API since server updates password during OTP verification
+    return await verifyOtpAndUpdatePasswordAPI(email, otpToken, newPassword);
   } catch (error) {
-    throw {
-      success: false,
-      message: error.message || "Network error occurred",
-    };
+    // Throw an Error object with the proper message
+    throw new Error(error.message || "Failed to reset password. Please try again.");
   }
 };
 

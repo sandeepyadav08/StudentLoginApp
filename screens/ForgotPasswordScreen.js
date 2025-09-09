@@ -63,7 +63,11 @@ export default function ForgotPasswordScreen({ navigation }) {
       );
       console.log('OTP sent to:', email);
     } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to send OTP');
+      // Show only a user-friendly alert, avoid noisy console errors in production
+      Alert.alert(
+        'Error', 
+        error.message || 'Failed to send OTP. Please check your email address and try again.'
+      );
     } finally {
       setLoading(false);
     }

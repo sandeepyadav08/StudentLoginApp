@@ -12,6 +12,7 @@ import {
   Platform,
   SafeAreaView,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { verifyOtpAPI } from '../services/api';
 
@@ -20,6 +21,10 @@ const { width, height } = Dimensions.get('window');
 export default function OtpVerificationScreen({ navigation, route }) {
   const { email } = route.params || {};
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [resendDisabled, setResendDisabled] = useState(true);
@@ -65,19 +70,41 @@ export default function OtpVerificationScreen({ navigation, route }) {
     }
   };
 
-  // Validate OTP
-  const validateOtp = () => {
-    const otpString = otp.join('');
-    if (otpString.length !== 6) {
-      setErrors({ otp: 'Please enter complete 6-digit OTP' });
-      return false;
-    }
-    return true;
+  // Validate password
+  const validatePassword = (password) => {
+    return password.length >= 8;
   };
 
-  // Handle OTP verification
+  // Form validation
+  const validateForm = () => {
+    const newErrors = {};
+
+    // Validate OTP
+    const otpString = otp.join('');
+    if (otpString.length !== 6) {
+      newErrors.otp = 'Please enter complete 6-digit OTP';
+    }
+
+    // Validate passwords
+    if (!newPassword.trim()) {
+      newErrors.newPassword = 'New password is required';
+    } else if (!validatePassword(newPassword)) {
+      newErrors.newPassword = 'Password must be at least 8 characters';
+    }
+
+    if (!confirmPassword.trim()) {
+      newErrors.confirmPassword = 'Please confirm your password';
+    } else if (newPassword !== confirmPassword) {
+      newErrors.confirmPassword = 'Passwords do not match';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  // Handle OTP verification and password reset in one step
   const handleVerifyOtp = async () => {
-    if (!validateOtp()) {
+    if (!validateForm()) {
       return;
     }
 
@@ -85,29 +112,43 @@ export default function OtpVerificationScreen({ navigation, route }) {
     try {
       const otpString = otp.join('');
       
-      // For now, we'll just validate the OTP format and navigate to reset password
-      // The actual OTP validation will happen when the user submits the new password
+      // Call combined API to verify OTP and reset password
+      const response = await verifyOtpAPI(email, otpString, newPassword);
+      
+      // If we reach here, OTP was verified and password was reset successfully
       Alert.alert(
-        'OTP Verified Successfully', 
-        'Your OTP has been verified. Now create your new password.',
+        'Password Reset Successful', 
+        response.message || 'Your password has been reset successfully! You can now login with your new password.',
         [
           {
-            text: 'Continue',
-            onPress: () => navigation.navigate('ResetPassword', { 
-              email, 
-              otpToken: otpString,
-              otpVerified: true
-            })
+            text: 'Login Now',
+            onPress: () => navigation.navigate('Login')
           }
         ]
       );
     } catch (error) {
-      Alert.alert('Error', error.message || 'Invalid OTP. Please try again.');
+      // Show only a user-friendly alert, avoid noisy console errors in production
+      Alert.alert('Error', error.message || 'Invalid OTP or failed to reset password. Please try again.');
       // Clear OTP on error
       setOtp(['', '', '', '', '', '']);
       otpRefs[0].current.focus();
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Clear error when user starts typing
+  const handleNewPasswordChange = (text) => {
+    setNewPassword(text);
+    if (errors.newPassword) {
+      setErrors({ ...errors, newPassword: null });
+    }
+  };
+
+  const handleConfirmPasswordChange = (text) => {
+    setConfirmPassword(text);
+    if (errors.confirmPassword) {
+      setErrors({ ...errors, confirmPassword: null });
     }
   };
 
@@ -119,10 +160,10 @@ export default function OtpVerificationScreen({ navigation, route }) {
     try {
       // Import and call the forgot password API again to resend OTP
       const { forgotPasswordAPI } = require('../services/api');
-      await forgotPasswordAPI(email);
-      Alert.alert('OTP Sent', 'New OTP has been sent to your email');
+      const response = await forgotPasswordAPI(email);
+      Alert.alert('OTP Sent', response.message || 'New OTP has been sent to your email');
     } catch (error) {
-      Alert.alert('Error', 'Failed to resend OTP. Please try again.');
+      Alert.alert('Error', error.message || 'Failed to resend OTP. Please try again.');
       setResendDisabled(false);
       setCountdown(0);
     }
@@ -140,13 +181,14 @@ export default function OtpVerificationScreen({ navigation, route }) {
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* OTP Verification Form */}
+          {/* OTP Verification and Password Reset Form */}
           <View style={styles.form}>
-            <Text style={styles.formTitle}>Enter OTP</Text>
+            <Text style={styles.formTitle}>Verify OTP & Reset Password</Text>
             
             <Text style={styles.description}>
-              We've sent a 6-digit code to{'\n'}
-              <Text style={styles.emailText}>{email}</Text>
+              Enter the 6-digit code sent to {'\n'}
+              <Text style={styles.emailText}>{email}</Text>{'\n'}
+              and create your new password
             </Text>
 
             {/* OTP Input Boxes */}
@@ -174,16 +216,76 @@ export default function OtpVerificationScreen({ navigation, route }) {
 
             {errors.otp && <Text style={styles.errorText}>{errors.otp}</Text>}
 
-            {/* Verify Button */}
+            {/* New Password Input */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>New Password</Text>
+              <View style={[styles.inputWrapper, errors.newPassword && styles.inputError]}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Enter new password"
+                  placeholderTextColor="#9ca3af"
+                  value={newPassword}
+                  onChangeText={handleNewPasswordChange}
+                  secureTextEntry={!showNewPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowNewPassword(!showNewPassword)}
+                  disabled={loading}
+                >
+                  <Ionicons 
+                    name={showNewPassword ? 'eye-outline' : 'eye-off-outline'} 
+                    size={22} 
+                    color="#a855f7" 
+                  />
+                </TouchableOpacity>
+              </View>
+              {errors.newPassword && <Text style={styles.errorText}>{errors.newPassword}</Text>}
+            </View>
+
+            {/* Confirm Password Input */}
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Confirm Password</Text>
+              <View style={[styles.inputWrapper, errors.confirmPassword && styles.inputError]}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="Confirm new password"
+                  placeholderTextColor="#9ca3af"
+                  value={confirmPassword}
+                  onChangeText={handleConfirmPasswordChange}
+                  secureTextEntry={!showConfirmPassword}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIcon}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  disabled={loading}
+                >
+                  <Ionicons 
+                    name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'} 
+                    size={22} 
+                    color="#a855f7" 
+                  />
+                </TouchableOpacity>
+              </View>
+              {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
+            </View>
+
+            {/* Reset Password Button */}
             <TouchableOpacity
               style={[styles.verifyButton, loading && styles.verifyButtonDisabled]}
               onPress={handleVerifyOtp}
               disabled={loading}
             >
               {loading ? (
-                <Text style={styles.verifyButtonText}>Verifying...</Text>
+                <Text style={styles.verifyButtonText}>Resetting Password...</Text>
               ) : (
-                <Text style={styles.verifyButtonText}>VERIFY OTP</Text>
+                <Text style={styles.verifyButtonText}>RESET PASSWORD</Text>
               )}
             </TouchableOpacity>
 
@@ -210,6 +312,13 @@ export default function OtpVerificationScreen({ navigation, route }) {
             >
               <Text style={styles.backToLoginText}>Back to Login</Text>
             </TouchableOpacity>
+
+            {/* Password Requirements */}
+            <View style={styles.requirementsContainer}>
+              <Text style={styles.requirementsTitle}>Password must contain:</Text>
+              <Text style={styles.requirementText}>• At least 8 characters</Text>
+              <Text style={styles.requirementText}>• Mix of letters and numbers recommended</Text>
+            </View>
 
             {/* Demo Info */}
             <View style={styles.demoCredentials}>
@@ -374,5 +483,55 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#6b7280',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+  },
+  // New styles for password inputs
+  inputContainer: {
+    marginBottom: 16,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 8,
+  },
+  inputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#d1d5db',
+    borderRadius: 12,
+    backgroundColor: '#f9fafb',
+    paddingHorizontal: 16,
+    height: 48,
+  },
+  inputError: {
+    borderColor: '#ef4444',
+    backgroundColor: '#fef2f2',
+  },
+  input: {
+    flex: 1,
+    fontSize: 16,
+    color: '#374151',
+    paddingVertical: 0,
+  },
+  eyeIcon: {
+    padding: 8,
+  },
+  requirementsContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+  },
+  requirementsTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: 6,
+  },
+  requirementText: {
+    fontSize: 11,
+    color: '#6b7280',
+    marginBottom: 2,
   },
 });
