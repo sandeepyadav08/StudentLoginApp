@@ -75,7 +75,6 @@ export default function LoginScreen({ navigation }) {
   };
 
   // Handle login
- // Handle login
 const handleLogin = async () => {
   if (!validateForm()) {
     return;
@@ -125,8 +124,6 @@ const handleLogin = async () => {
     );
   }
 };
-
-
   // Clear error when user starts typing
   const handleEmailChange = (text) => {
     setEmail(text);
