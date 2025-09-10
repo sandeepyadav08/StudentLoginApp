@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
@@ -49,9 +49,18 @@ export default function DashboardScreen({ navigation }) {
   const [error, setError] = useState(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [drawerAnimation] = useState(new Animated.Value(-width * 0.8));
+  const [isDrawerAnimating, setIsDrawerAnimating] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const isMounted = useRef(true);
 
   useEffect(() => {
+    isMounted.current = true;
     loadDashboardData();
+    
+    // Cleanup function
+    return () => {
+      isMounted.current = false;
+    };
   }, []);
 
   const loadDashboardData = async () => {
@@ -78,13 +87,23 @@ export default function DashboardScreen({ navigation }) {
   };
 
   const toggleDrawer = () => {
+    // Prevent multiple rapid calls during animation
+    if (isDrawerAnimating) return;
+    
+    setIsDrawerAnimating(true);
+    
     if (drawerVisible) {
       // Close drawer
       Animated.timing(drawerAnimation, {
         toValue: -width * 0.8,
         duration: 300,
         useNativeDriver: true,
-      }).start(() => setDrawerVisible(false));
+      }).start(() => {
+        if (isMounted.current) {
+          setDrawerVisible(false);
+          setIsDrawerAnimating(false);
+        }
+      });
     } else {
       // Open drawer
       setDrawerVisible(true);
@@ -92,20 +111,48 @@ export default function DashboardScreen({ navigation }) {
         toValue: 0,
         duration: 300,
         useNativeDriver: true,
-      }).start();
+      }).start(() => {
+        if (isMounted.current) {
+          setIsDrawerAnimating(false);
+        }
+      });
     }
   };
 
   const handleDrawerItemPress = (item) => {
-    toggleDrawer();
-    if (item === 'Helpdesk') {
-      navigation.navigate('HelpdeskForm');
-    } else {
-      Alert.alert('Navigation', `Navigate to ${item}`);
+    // Prevent multiple rapid calls
+    if (isDrawerAnimating) return;
+    
+    // Close drawer first, then navigate after animation completes
+    if (drawerVisible) {
+      setIsDrawerAnimating(true);
+      Animated.timing(drawerAnimation, {
+        toValue: -width * 0.8,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        if (isMounted.current) {
+          setDrawerVisible(false);
+          setIsDrawerAnimating(false);
+          
+          // Navigate after drawer is closed
+          setTimeout(() => {
+            if (isMounted.current) {
+              if (item === 'Helpdesk') {
+                navigation.navigate('HelpdeskForm');
+              } else {
+                Alert.alert('Navigation', `Navigate to ${item}`);
+              }
+            }
+          }, 100); // Small delay to ensure state updates are complete
+        }
+      });
     }
   };
 
   const handleLogout = async () => {
+    if (isNavigating) return;
+    
     Alert.alert(
       'Logout',
       'Are you sure you want to logout?',
@@ -114,6 +161,7 @@ export default function DashboardScreen({ navigation }) {
         { 
           text: 'Logout', 
           onPress: async () => {
+            setIsNavigating(true);
             try {
               const token = await AsyncStorage.getItem('userToken');
               if (token) {
@@ -136,7 +184,17 @@ export default function DashboardScreen({ navigation }) {
   };
 
   const handleDataNavigation = () => {
+    if (isNavigating) return;
+    setIsNavigating(true);
+    
     navigation.navigate('DataTabs');
+    
+    // Reset navigation flag after a brief delay
+    setTimeout(() => {
+      if (isMounted.current) {
+        setIsNavigating(false);
+      }
+    }, 1000);
   };
 
   const StatCard = ({ title, count, color, icon }) => (
@@ -209,7 +267,12 @@ export default function DashboardScreen({ navigation }) {
         paddingHorizontal: getResponsivePadding(16, screenWidth),
         paddingVertical: getResponsivePadding(15, screenWidth)
       }]}>
-        <TouchableOpacity style={styles.menuButton} onPress={toggleDrawer}>
+        <TouchableOpacity 
+          style={styles.menuButton} 
+          onPress={toggleDrawer}
+          disabled={isDrawerAnimating}
+          activeOpacity={0.7}
+        >
           <Ionicons name="menu" size={24} color="#7c3aed" />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { fontSize: getResponsiveSize(18, screenWidth) }]}>Student Portal</Text>
@@ -323,11 +386,21 @@ export default function DashboardScreen({ navigation }) {
           <Ionicons name="home" size={screenWidth < 350 ? 20 : 24} color="#7c3aed" />
           <Text style={[styles.navText, { fontSize: screenWidth < 350 ? 9 : 10 }]}>Home</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={handleDataNavigation}>
+        <TouchableOpacity 
+          style={styles.navItem} 
+          onPress={handleDataNavigation}
+          disabled={isNavigating || isDrawerAnimating}
+          activeOpacity={0.7}
+        >
           <Ionicons name="bar-chart-outline" size={screenWidth < 350 ? 20 : 24} color="#9ca3af" />
           <Text style={[styles.navText, { color: '#9ca3af', fontSize: screenWidth < 350 ? 9 : 10 }]}>Data</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navItem} onPress={handleLogout}>
+        <TouchableOpacity 
+          style={styles.navItem} 
+          onPress={handleLogout}
+          disabled={isNavigating || isDrawerAnimating}
+          activeOpacity={0.7}
+        >
           <Ionicons name="log-out-outline" size={screenWidth < 350 ? 20 : 24} color="#9ca3af" />
           <Text style={[styles.navText, { color: '#9ca3af', fontSize: screenWidth < 350 ? 9 : 10 }]}>Logout</Text>
         </TouchableOpacity>
@@ -344,6 +417,7 @@ export default function DashboardScreen({ navigation }) {
           style={styles.drawerOverlay}
           activeOpacity={1}
           onPress={toggleDrawer}
+          disabled={isDrawerAnimating}
         >
           <Animated.View
             style={[
@@ -356,7 +430,11 @@ export default function DashboardScreen({ navigation }) {
             <TouchableOpacity activeOpacity={1}>
               <View style={styles.drawerHeader}>
                 <Text style={styles.drawerTitle}>Menu</Text>
-                <TouchableOpacity onPress={toggleDrawer}>
+                <TouchableOpacity 
+                  onPress={toggleDrawer}
+                  disabled={isDrawerAnimating}
+                  activeOpacity={0.7}
+                >
                   <Ionicons name="close" size={24} color="#7c3aed" />
                 </TouchableOpacity>
               </View>
@@ -365,6 +443,8 @@ export default function DashboardScreen({ navigation }) {
                 <TouchableOpacity
                   style={styles.drawerItem}
                   onPress={() => handleDrawerItemPress('Helpdesk')}
+                  disabled={isDrawerAnimating}
+                  activeOpacity={0.7}
                 >
                   <Ionicons name="help-circle-outline" size={24} color="#7c3aed" />
                   <Text style={styles.drawerItemText}>Helpdesk</Text>
@@ -373,6 +453,8 @@ export default function DashboardScreen({ navigation }) {
                 <TouchableOpacity
                   style={styles.drawerItem}
                   onPress={() => handleDrawerItemPress('Grievance')}
+                  disabled={isDrawerAnimating}
+                  activeOpacity={0.7}
                 >
                   <Ionicons name="alert-circle-outline" size={24} color="#7c3aed" />
                   <Text style={styles.drawerItemText}>Grievance</Text>
@@ -381,6 +463,8 @@ export default function DashboardScreen({ navigation }) {
                 <TouchableOpacity
                   style={styles.drawerItem}
                   onPress={() => handleDrawerItemPress('Utility')}
+                  disabled={isDrawerAnimating}
+                  activeOpacity={0.7}
                 >
                   <Ionicons name="construct-outline" size={24} color="#7c3aed" />
                   <Text style={styles.drawerItemText}>Utility</Text>
