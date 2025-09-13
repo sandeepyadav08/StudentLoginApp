@@ -8,6 +8,7 @@ import OtpVerificationScreen from './screens/OtpVerificationScreen';
 import DashboardScreen from './screens/DashboardScreen';
 import DataTabNavigator from './screens/DataTabNavigator';
 import HelpdeskFormScreen from './screens/HelpdeskFormScreen';
+import GrievanceFormScreen from './screens/GrievanceFormScreen';
 
 const Stack = createStackNavigator();
 
@@ -44,6 +45,10 @@ export default function App() {
           <Stack.Screen 
             name="HelpdeskForm" 
             component={HelpdeskFormScreen}
+          />
+          <Stack.Screen 
+            name="GrievanceForm" 
+            component={GrievanceFormScreen}
           />
         </Stack.Navigator>
       </NavigationContainer>
