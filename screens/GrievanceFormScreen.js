@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { readUserAPI, getCategoriesAPI, saveGrievanceAPI } from '../services/api';
 
 const { width } = Dimensions.get('window');
 
@@ -46,67 +47,140 @@ const GrievanceFormScreen = ({ navigation }) => {
   
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingUserData, setIsLoadingUserData] = useState(true);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
   const [errors, setErrors] = useState({});
   const [showMainCategoryPicker, setShowMainCategoryPicker] = useState(false);
   const [showSubCategoryPicker, setShowSubCategoryPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  
+  // Dynamic categories from API
+  const [mainCategories, setMainCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState({});
 
-  const mainCategories = [
-    { id: 1, value: "ragging", text: "Ragging" },
-    { id: 2, value: "harassment", text: "Harassment" },
-    { id: 3, value: "academics", text: "Academics" },
-    { id: 4, value: "hostel_campus", text: "Hostel & Campus Facilities" },
-    { id: 5, value: "administration", text: "Administration & Policy" },
-    { id: 6, value: "health_safety", text: "Health & Safety" },
-    { id: 7, value: "placement", text: "Placement & Internship" },
-    { id: 8, value: "financial_aid", text: "Financial Aid & Scholarships" },
-    { id: 9, value: "others", text: "Others" },
-  ];
+  // Load user data and categories on component mount
+  React.useEffect(() => {
+    loadInitialData();
+  }, []);
 
-  const subCategories = {
-    ragging: [
-      { id: 11, value: "physical_harassment", text: "Physical harassment" },
-      { id: 12, value: "verbal_emotional", text: "Verbal or emotional abuse" },
-      { id: 13, value: "cyber_ragging", text: "Cyber ragging / online harassment" },
-    ],
-    harassment: [
-      { id: 21, value: "sexual_harassment", text: "Sexual harassment (as per POSH guidelines)" },
-      { id: 22, value: "bullying_discrimination", text: "Bullying or discrimination (gender, caste, religion, disability, etc.)" },
-      { id: 23, value: "mental_emotional", text: "Mental or emotional harassment" },
-    ],
-    academics: [
-      { id: 31, value: "faculty_behavior", text: "Faculty behavior / unfair grading" },
-      { id: 32, value: "examination_issues", text: "Examination or evaluation issues" },
-      { id: 33, value: "course_content", text: "Course content or scheduling problems" },
-      { id: 34, value: "attendance_marks", text: "Attendance or marks disputes" },
-    ],
-    hostel_campus: [
-      { id: 41, value: "maintenance", text: "Plumbing, electricity, water supply" },
-      { id: 42, value: "cleanliness", text: "Cleanliness and maintenance" },
-      { id: 43, value: "room_allocation", text: "Room allocation or roommate issues" },
-      { id: 44, value: "mess_food", text: "Mess or food quality concerns" },
-      { id: 45, value: "it_wifi", text: "IT & Wi-Fi connectivity" },
-    ],
-    administration: [
-      { id: 51, value: "fee_issues", text: "Fee-related issues or refunds" },
-      { id: 52, value: "documents", text: "ID cards, certificates, or document delays" },
-      { id: 53, value: "miscommunication", text: "Miscommunication or delays from departments" },
-    ],
-    health_safety: [
-      { id: 61, value: "medical", text: "Medical emergencies or inadequate medical facilities" },
-      { id: 62, value: "unsafe_conditions", text: "Unsafe campus conditions (e.g., lighting, pathways)" },
-    ],
-    placement: [
-      { id: 71, value: "recruitment_discrimination", text: "Discrimination or unfair treatment during recruitment" },
-      { id: 72, value: "placement_cell_issues", text: "Issues with placement cell or recruiters" },
-    ],
-    financial_aid: [
-      { id: 81, value: "disbursement_delay", text: "Delay in disbursement" },
-      { id: 82, value: "ineligibility_disputes", text: "Ineligibility disputes" },
-    ],
-    others: [
-      { id: 91, value: "suggestion_box", text: "Suggestion box (general feedback or improvement ideas)" },
-    ],
+  const loadInitialData = async () => {
+    await Promise.all([
+      loadUserData(),
+      loadCategories()
+    ]);
+  };
+
+  // Load user data from API
+  const loadUserData = async () => {
+    try {
+      setIsLoadingUserData(true);
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) {
+        Alert.alert("Error", "Authentication token not found. Please login again.");
+        navigation.goBack();
+        return;
+      }
+
+      const response = await readUserAPI(token);
+      console.log('User API Response:', response);
+      if (response.success && response.user) {
+        const user = response.user;
+        console.log('User Data:', user);
+        // Auto-fill form fields with user data
+        setName(user.name || "");
+        setMobileNo(user.mobile || user.phone || "");
+        setEmail(user.email || "");
+        setRollNo(user.roll_no || user.student_id || user.rollNo || "");
+        console.log('Form fields set:', {
+          name: user.name,
+          mobile: user.mobile || user.phone,
+          email: user.email,
+          roll_no: user.roll_no
+        });
+      }
+    } catch (error) {
+      console.error("Failed to load user data:", error);
+      Alert.alert("Warning", "Could not auto-fill user information. Please enter manually.");
+    } finally {
+      setIsLoadingUserData(false);
+    }
+  };
+
+  // Load categories from API
+  const loadCategories = async () => {
+    try {
+      setIsLoadingCategories(true);
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) {
+        Alert.alert("Error", "Authentication token not found. Please login again.");
+        navigation.goBack();
+        return;
+      }
+
+      const response = await getCategoriesAPI(token);
+      if (response.success && response.categories) {
+        // Transform API response to expected format
+        const apiData = response.categories;
+        
+        console.log('Categories API Data:', apiData);
+        
+        // The API returns nested structure: { grievance: { category: {...}, sub_category: {...} } }
+        const categories = apiData.grievance?.category || {};
+        const subCategoriesData = apiData.grievance?.sub_category || {};
+        
+        console.log('Main Categories from API:', categories);
+        console.log('Sub Categories from API:', subCategoriesData);
+        
+        // Parse main categories
+        const mainCats = Object.entries(categories).map(([id, name]) => ({
+          id: parseInt(id),
+          value: name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+          text: name
+        }));
+        
+        console.log('Parsed Main Categories:', mainCats);
+        
+        setMainCategories(mainCats);
+        
+        // Parse subcategories from API data
+        const subCats = {};
+        
+        // Map main category IDs to their values for subcategory mapping
+        const categoryIdToValue = {};
+        mainCats.forEach(cat => {
+          categoryIdToValue[cat.id] = cat.value;
+        });
+        
+        // Parse subcategories from API response
+        Object.entries(subCategoriesData).forEach(([categoryId, subCategoryData]) => {
+          const mainCategoryValue = categoryIdToValue[parseInt(categoryId)];
+          if (mainCategoryValue && subCategoryData) {
+            subCats[mainCategoryValue] = Object.entries(subCategoryData).map(([subId, subName]) => ({
+              id: parseInt(subId),
+              value: subName.toLowerCase().replace(/[^a-z0-9]/g, '_'),
+              text: subName
+            }));
+          }
+        });
+        
+        console.log('Parsed Sub Categories:', subCats);
+        setSubCategories(subCats);
+      }
+    } catch (error) {
+      console.error("Failed to load categories:", error);
+      Alert.alert("Error", "Failed to load categories. Please try again.");
+      // Use fallback categories if API fails
+      setMainCategories([
+        { id: 1, value: "general", text: "General Grievance" },
+        { id: 2, value: "academic", text: "Academic Issues" },
+        { id: 3, value: "administrative", text: "Administrative Issues" },
+        { id: 4, value: "facilities", text: "Facilities Issues" },
+        { id: 5, value: "others", text: "Others" },
+      ]);
+      setSubCategories({});
+    } finally {
+      setIsLoadingCategories(false);
+    }
   };
 
   // Form validation
@@ -126,7 +200,9 @@ const GrievanceFormScreen = ({ navigation }) => {
     }
     if (!rollNo.trim()) newErrors.rollNo = "Roll No./Student ID is required";
     if (!mainCategory) newErrors.mainCategory = "Please select main category";
-    if (!subCategory && mainCategory !== "others") {
+    // Only require subcategory if subcategories exist for the selected main category
+    const hasSubCategories = mainCategory && subCategories[mainCategory] && subCategories[mainCategory].length > 0;
+    if (hasSubCategories && !subCategory) {
       newErrors.subCategory = "Please select sub category";
     }
     if (!description.trim()) {
@@ -161,47 +237,66 @@ const GrievanceFormScreen = ({ navigation }) => {
 
       const grievanceData = {
         name: name.trim(),
-        mobileNo: mobileNo.trim(),
+        mobile: mobileNo.trim(),
         email: email.trim(),
-        rollNo: rollNo.trim(),
-        mainCategory: getCategoryId(mainCategory, mainCategories),
-        subCategory: getSubCategoryId(mainCategory, subCategory),
+        roll_no: rollNo.trim(),
+        category: getCategoryId(mainCategory, mainCategories),
+        sub_category: getSubCategoryId(mainCategory, subCategory) || '',
         description: description.trim(),
-        incidentDate: formatDate(incidentDate),
+        incident_date: formatDate(incidentDate),
+        query_type: 'grievance'
       };
 
       console.log('Submitting grievance:', grievanceData);
 
-      // Here you would call your grievance submission API
-      // const response = await submitGrievanceAPI(grievanceData, token);
+      // Call the API
+      const response = await saveGrievanceAPI(grievanceData, token);
+      console.log('API Response:', response);
 
-      // For now, simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
-
-      Alert.alert(
-        "Success",
-        "Your grievance has been submitted successfully. You will receive a confirmation email shortly.",
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              // Reset form
-              setName("");
-              setMobileNo("");
-              setEmail("");
-              setRollNo("");
-              setMainCategory("");
-              setSubCategory("");
-              setDescription("");
-              setIncidentDate(new Date());
-              setErrors({});
-              navigation.goBack();
+      // Check if the response indicates success
+      if (response && response.success) {
+        const successMessage = response.message || "Your grievance has been submitted successfully. You will receive a confirmation email shortly.";
+        const queryId = response.queryId || response.data?.query_id || response.data?.id;
+        
+        let alertMessage = successMessage;
+        if (queryId) {
+          alertMessage += `\n\nReference ID: ${queryId}`;
+        }
+        
+        Alert.alert(
+          "Success",
+          alertMessage,
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                // Reset form
+                setName("");
+                setMobileNo("");
+                setEmail("");
+                setRollNo("");
+                setMainCategory("");
+                setSubCategory("");
+                setDescription("");
+                setIncidentDate(new Date());
+                setErrors({});
+                navigation.goBack();
+              },
             },
-          },
-        ]
-      );
+          ]
+        );
+      } else {
+        // Handle case where response doesn't indicate success
+        throw new Error(response?.message || "Unknown error occurred while submitting grievance");
+      }
     } catch (error) {
-      Alert.alert("Error", error.message || "Failed to submit grievance");
+      console.error('Grievance submission error:', error);
+      
+      Alert.alert(
+        "Submission Failed", 
+        error.message || "Failed to submit grievance. Please try again.",
+        [{ text: "OK" }]
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -219,6 +314,7 @@ const GrievanceFormScreen = ({ navigation }) => {
   };
 
   const getSubCategoryId = (mainCategoryValue, subCategoryValue) => {
+    if (!subCategoryValue) return null;
     const subCats = subCategories[mainCategoryValue];
     if (!subCats) return null;
     const subCategory = subCats.find((cat) => cat.value === subCategoryValue);
@@ -257,6 +353,43 @@ const GrievanceFormScreen = ({ navigation }) => {
       setErrors({ ...errors, [field]: "" });
     }
   };
+
+  // Show loading screen while initial data is loading
+  if (isLoadingUserData || isLoadingCategories) {
+    return (
+      <SafeAreaView style={styles.container}>
+        {/* Header */}
+        <View style={[styles.header, {
+          paddingHorizontal: getResponsivePadding(16, screenWidth),
+          paddingVertical: getResponsivePadding(15, screenWidth)
+        }]}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Ionicons name="arrow-back" size={24} color="#8b5cf6" />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { fontSize: getResponsiveSize(18, screenWidth) }]}>
+            Submit Grievance
+          </Text>
+          <View style={styles.placeholder} />
+        </View>
+        
+        {/* Loading Content */}
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#7c3aed" />
+          <Text style={[styles.loadingText, { fontSize: getResponsiveSize(16, screenWidth) }]}>
+            {isLoadingUserData && isLoadingCategories 
+              ? "Loading form data..."
+              : isLoadingUserData 
+              ? "Loading user information..."
+              : "Loading categories..."
+            }
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -299,14 +432,14 @@ const GrievanceFormScreen = ({ navigation }) => {
             </Text>
             <TextInput
               style={[styles.textInput, errors.name && styles.inputError]}
-              placeholder="Enter your full name"
+              placeholder={isLoadingUserData ? "Loading..." : "Enter your full name"}
               placeholderTextColor="#9ca3af"
               value={name}
               onChangeText={(text) => {
                 setName(text);
                 clearError('name');
               }}
-              editable={!isSubmitting}
+              editable={!isSubmitting && !isLoadingUserData}
             />
             {errors.name && <Text style={styles.errorText}>{errors.name}</Text>}
           </View>
@@ -318,7 +451,7 @@ const GrievanceFormScreen = ({ navigation }) => {
             </Text>
             <TextInput
               style={[styles.textInput, errors.mobileNo && styles.inputError]}
-              placeholder="Enter 10-digit mobile number"
+              placeholder={isLoadingUserData ? "Loading..." : "Enter 10-digit mobile number"}
               placeholderTextColor="#9ca3af"
               value={mobileNo}
               onChangeText={(text) => {
@@ -327,7 +460,7 @@ const GrievanceFormScreen = ({ navigation }) => {
               }}
               keyboardType="numeric"
               maxLength={10}
-              editable={!isSubmitting}
+              editable={!isSubmitting && !isLoadingUserData}
             />
             {errors.mobileNo && <Text style={styles.errorText}>{errors.mobileNo}</Text>}
           </View>
@@ -339,7 +472,7 @@ const GrievanceFormScreen = ({ navigation }) => {
             </Text>
             <TextInput
               style={[styles.textInput, errors.email && styles.inputError]}
-              placeholder="Enter your email address"
+              placeholder={isLoadingUserData ? "Loading..." : "Enter your email address"}
               placeholderTextColor="#9ca3af"
               value={email}
               onChangeText={(text) => {
@@ -348,7 +481,7 @@ const GrievanceFormScreen = ({ navigation }) => {
               }}
               keyboardType="email-address"
               autoCapitalize="none"
-              editable={!isSubmitting}
+              editable={!isSubmitting && !isLoadingUserData}
             />
             {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
           </View>
@@ -360,14 +493,14 @@ const GrievanceFormScreen = ({ navigation }) => {
             </Text>
             <TextInput
               style={[styles.textInput, errors.rollNo && styles.inputError]}
-              placeholder="Enter your roll number or student ID"
+              placeholder={isLoadingUserData ? "Loading..." : "Enter your roll number or student ID"}
               placeholderTextColor="#9ca3af"
               value={rollNo}
               onChangeText={(text) => {
                 setRollNo(text);
                 clearError('rollNo');
               }}
-              editable={!isSubmitting}
+              editable={!isSubmitting && !isLoadingUserData}
             />
             {errors.rollNo && <Text style={styles.errorText}>{errors.rollNo}</Text>}
           </View>
@@ -388,7 +521,7 @@ const GrievanceFormScreen = ({ navigation }) => {
             <TouchableOpacity
               style={[styles.pickerButton, errors.mainCategory && styles.inputError]}
               onPress={() => setShowMainCategoryPicker(true)}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isLoadingCategories}
             >
               <Text
                 style={[
@@ -397,7 +530,10 @@ const GrievanceFormScreen = ({ navigation }) => {
                   { fontSize: getResponsiveSize(14, screenWidth) }
                 ]}
               >
-                {getCategoryText(mainCategory, mainCategories)}
+                {isLoadingCategories 
+                  ? "Loading categories..."
+                  : (mainCategory ? getCategoryText(mainCategory, mainCategories) : "Choose a category")
+                }
               </Text>
               <Ionicons name="chevron-down" size={20} color="#8b5cf6" />
             </TouchableOpacity>
@@ -405,7 +541,7 @@ const GrievanceFormScreen = ({ navigation }) => {
           </View>
 
           {/* Sub-Category Selection */}
-          {mainCategory && mainCategory !== "others" && (
+          {mainCategory && subCategories[mainCategory] && subCategories[mainCategory].length > 0 && (
             <View style={styles.inputSection}>
               <Text style={[styles.label, { fontSize: getResponsiveSize(14, screenWidth) }]}>
                 Sub Category *
@@ -413,7 +549,7 @@ const GrievanceFormScreen = ({ navigation }) => {
               <TouchableOpacity
                 style={[styles.pickerButton, errors.subCategory && styles.inputError]}
                 onPress={() => setShowSubCategoryPicker(true)}
-                disabled={isSubmitting}
+                disabled={isSubmitting || isLoadingCategories}
               >
                 <Text
                   style={[
@@ -424,7 +560,7 @@ const GrievanceFormScreen = ({ navigation }) => {
                 >
                   {subCategory 
                     ? getCategoryText(subCategory, subCategories[mainCategory] || [])
-                    : "Choose sub category"
+                    : isLoadingCategories ? "Loading subcategories..." : "Choose sub category"
                   }
                 </Text>
                 <Ionicons name="chevron-down" size={20} color="#8b5cf6" />
@@ -598,6 +734,17 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 40,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  loadingText: {
+    marginTop: 16,
+    color: "#6b7280",
+    textAlign: "center",
   },
   scrollContainer: {
     paddingVertical: 20,

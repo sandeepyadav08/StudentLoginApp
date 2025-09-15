@@ -3,6 +3,174 @@
 // API Service for Student Login App
 const API_BASE_URL = "http://192.168.29.217/iimt-application/api/portal";
 
+// Read User API
+export const readUserAPI = async (token) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/read-user`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await response.json();
+
+    console.log("Read User Response:", {
+      status: response.status,
+      ok: response.ok,
+      data: data,
+    });
+
+    if (!response.ok || (data.status !== 200 && data.status !== 201)) {
+      throw new Error(data.message || "Failed to fetch user data");
+    }
+
+    return {
+      success: true,
+      user: data.data || data.user,
+      message: data.message || "User data fetched successfully",
+    };
+  } catch (error) {
+    console.error("Read User Error:", error);
+    throw new Error(error.message || "Failed to fetch user data");
+  }
+};
+
+// Get Categories API
+export const getCategoriesAPI = async (token) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/get-category`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await response.json();
+
+    console.log("Get Categories Response:", {
+      status: response.status,
+      ok: response.ok,
+      data: data,
+    });
+
+    if (!response.ok || (data.status !== 200 && data.status !== 201)) {
+      throw new Error(data.message || "Failed to fetch categories");
+    }
+
+    return {
+      success: true,
+      categories: data.res || data.categories || data.data,
+      message: data.message || "Categories fetched successfully",
+    };
+  } catch (error) {
+    console.error("Get Categories Error:", error);
+    throw new Error(error.message || "Failed to fetch categories");
+  }
+};
+
+// Save Grievance/Query API
+export const saveGrievanceAPI = async (grievanceData, token) => {
+  try {
+    let formData = new FormData();
+    
+    // Map the data to match server expectations (only required fields)
+    const serverData = {
+      // User information
+      name: grievanceData.name || '',
+      mobile: grievanceData.mobile || '',
+      email: grievanceData.email || '',
+      roll_no: grievanceData.roll_no || '',
+      
+      // Category information  
+      category: grievanceData.category || '',         // Keep for compatibility
+      query_type: grievanceData.category || '',       // Server expects category ID here
+      sub_category: grievanceData.sub_category || '', // Keep for compatibility
+      sub_type: grievanceData.sub_category || '',     // Server expects this field
+      
+      // Grievance details
+      description: grievanceData.description || '',
+      message: grievanceData.description || '', // Required by server
+      incident_date: grievanceData.incident_date || '',
+      type: 'grievance',                              // Keep grievance type separate
+      
+      // Required datetime field
+      datetime: new Date().toISOString(),
+      
+      // Optional metadata
+      subject: 'Grievance Submission',
+      priority: 'normal',
+      status: 'open',
+      source: 'mobile_app'
+    };
+    
+    // Add all data to FormData
+    Object.keys(serverData).forEach(key => {
+      if (serverData[key] !== null && serverData[key] !== undefined && serverData[key] !== '') {
+        formData.append(key, serverData[key]);
+      }
+    });
+
+    console.log("Save Grievance Request:", {
+      url: `${API_BASE_URL}/save-query`,
+      data: grievanceData,
+    });
+
+    const response = await fetch(`${API_BASE_URL}/save-query`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    // Handle non-JSON responses first
+    const responseText = await response.text();
+    let data;
+    
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse response:", responseText);
+      // If it's a successful response but not JSON, handle it
+      if (response.ok) {
+        return {
+          success: true,
+          message: responseText || "Grievance submitted successfully",
+          data: { raw_response: responseText },
+        };
+      }
+      throw new Error("Invalid server response: " + responseText.slice(0, 100));
+    }
+
+    console.log("Save Grievance Response:", {
+      status: response.status,
+      ok: response.ok,
+      success: data.message || data.data?.message,
+    });
+
+    // Handle successful responses (200, 201)
+    if (response.ok && (response.status === 200 || response.status === 201)) {
+      return {
+        success: true,
+        message: data.message || data.msg || "Grievance submitted successfully",
+        data: data,
+        queryId: data.query_id || data.id || null,
+      };
+    }
+
+    // Handle error responses
+    const errorMessage = data.message || data.data?.message || data.error || "Failed to submit grievance";
+    throw new Error(errorMessage);
+  } catch (error) {
+    console.error("Save Grievance Error:", error);
+    throw new Error(error.message || "Failed to submit grievance");
+  }
+};
+
+
 export const loginAPI = async (email, password) => {
   let formData = new FormData();
   formData.append("login_email", email);
@@ -36,7 +204,7 @@ export const loginAPI = async (email, password) => {
     .catch((error) => {
       return {
         success: false,
-        message:'Somthing Went Wrong...',
+        message:'Something Went Wrong...',
         user: {
           email: email,
         },
