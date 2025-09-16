@@ -9,7 +9,7 @@ export const readUserAPI = async (token) => {
     const response = await fetch(`${API_BASE_URL}/read-user`, {
       method: "GET",
       headers: {
-        "Authorization": `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
     });
@@ -43,7 +43,7 @@ export const getCategoriesAPI = async (token) => {
     const response = await fetch(`${API_BASE_URL}/get-category`, {
       method: "GET",
       headers: {
-        "Authorization": `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json",
       },
     });
@@ -73,55 +73,55 @@ export const getCategoriesAPI = async (token) => {
 
 // Save Grievance/Query API
 export const saveGrievanceAPI = async (grievanceData, token) => {
+
   try {
     let formData = new FormData();
-    
+
     // Map the data to match server expectations (only required fields)
     const serverData = {
       // User information
-      name: grievanceData.name || '',
-      mobile: grievanceData.mobile || '',
-      email: grievanceData.email || '',
-      roll_no: grievanceData.roll_no || '',
-      
-      // Category information  
-      category: grievanceData.category || '',         // Keep for compatibility
-      query_type: grievanceData.category || '',       // Server expects category ID here
-      sub_category: grievanceData.sub_category || '', // Keep for compatibility
-      sub_type: grievanceData.sub_category || '',     // Server expects this field
-      
+      name: grievanceData.name || "",
+      mobile: grievanceData.mobile || "",
+      email: grievanceData.email || "",
+      roll_no: grievanceData.roll_no || "",
+
+      // Category information
+      query_type: grievanceData.category || "", // Server expects category ID here
+      sub_type: grievanceData.sub_category || "", // Server expects category ID here
+
       // Grievance details
-      description: grievanceData.description || '',
-      message: grievanceData.description || '', // Required by server
-      incident_date: grievanceData.incident_date || '',
-      type: 'grievance',                              // Keep grievance type separate
-      
+      message: grievanceData.description || "", // Required by server
+      datetime: grievanceData.incident_date || "",
+      type: "grievance", // Keep grievance type separate
+
       // Required datetime field
-      datetime: new Date().toISOString(),
-      
+
       // Optional metadata
-      subject: 'Grievance Submission',
-      priority: 'normal',
-      status: 'open',
-      source: 'mobile_app'
+      subject: "Grievance Submission",
+      priority: "normal",
+      status: "open",
+      source: "mobile_app",
     };
-    
+
+
+
     // Add all data to FormData
-    Object.keys(serverData).forEach(key => {
-      if (serverData[key] !== null && serverData[key] !== undefined && serverData[key] !== '') {
+    Object.keys(serverData).forEach((key) => {
+      if (
+        serverData[key] !== null &&
+        serverData[key] !== undefined &&
+        serverData[key] !== ""
+      ) {
         formData.append(key, serverData[key]);
       }
     });
 
-    console.log("Save Grievance Request:", {
-      url: `${API_BASE_URL}/save-query`,
-      data: grievanceData,
-    });
+  console.log('hbhbhjbhj',formData)
 
     const response = await fetch(`${API_BASE_URL}/save-query`, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${token}`,
+        Authorization: `Bearer ${token}`,
       },
       body: formData,
     });
@@ -129,7 +129,7 @@ export const saveGrievanceAPI = async (grievanceData, token) => {
     // Handle non-JSON responses first
     const responseText = await response.text();
     let data;
-    
+
     try {
       data = JSON.parse(responseText);
     } catch (parseError) {
@@ -162,7 +162,11 @@ export const saveGrievanceAPI = async (grievanceData, token) => {
     }
 
     // Handle error responses
-    const errorMessage = data.message || data.data?.message || data.error || "Failed to submit grievance";
+    const errorMessage =
+      data.message ||
+      data.data?.message ||
+      data.error ||
+      "Failed to submit grievance";
     throw new Error(errorMessage);
   } catch (error) {
     console.error("Save Grievance Error:", error);
@@ -170,6 +174,102 @@ export const saveGrievanceAPI = async (grievanceData, token) => {
   }
 };
 
+// Save Helpdesk/Ticket API
+export const saveHelpdeskAPI = async (ticketData, token) => {
+  try {
+    let formData = new FormData();
+console.log(ticketData)
+const formatDate = (date) => {
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = (d.getMonth() + 1).toString().padStart(2, '0');
+  const day = d.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
+
+    // Map the data to match server expectations for helpdesk
+    const serverData = {
+      // Category information
+      category: ticketData.category || "", // Keep for compatibility
+      sub_category: ticketData.sub_category || "", // Keep for compatibility
+      description: ticketData.description || "",
+      start_date: formatDate(ticketData.start_date),
+      start_time: ticketData.start_time || "",
+      end_time: ticketData.end_time || "",
+      doc_file: ticketData.docFile || "",
+
+      // Optional metadata
+      subject: "Helpdesk Ticket",
+      priority: "normal",
+      status: "open",
+      source: "mobile_app",
+      type: "helpdesk",
+    };
+
+    // Append each key-value pair
+    Object.entries(serverData).forEach(([key, value]) => {
+      formData.append(key, value);
+    });
+
+    console.log(formData);
+
+    const response = await fetch(`${API_BASE_URL}/save-tickets`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    // Handle non-JSON responses first
+    const responseText = await response.text();
+    let data;
+
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse response:", responseText);
+      // If it's a successful response but not JSON, handle it
+      if (response.ok) {
+        return {
+          success: true,
+          message: responseText || "Helpdesk ticket submitted successfully",
+          data: { raw_response: responseText },
+        };
+      }
+      throw new Error("Invalid server response: " + responseText.slice(0, 100));
+    }
+
+    console.log("Save Helpdesk Response:", {
+      status: response.status,
+      ok: response.ok,
+      success: data.message || data.data?.message,
+    });
+
+    // Handle successful responses (200, 201)
+    if (response.ok && (response.status === 200 || response.status === 201)) {
+      return {
+        success: true,
+        message:
+          data.message || data.msg || "Helpdesk ticket submitted successfully",
+        data: data,
+        ticketId: data.ticket_id || data.id || null,
+      };
+    }
+
+    // Handle error responses
+    const errorMessage =
+      data.message ||
+      data.data?.message ||
+      data.error ||
+      "Failed to submit helpdesk ticket";
+    throw new Error(errorMessage);
+  } catch (error) {
+    console.error("Save Helpdesk Error:", error);
+    throw new Error(error.message || "Failed to submit helpdesk ticket");
+  }
+};
 
 export const loginAPI = async (email, password) => {
   let formData = new FormData();
@@ -204,7 +304,7 @@ export const loginAPI = async (email, password) => {
     .catch((error) => {
       return {
         success: false,
-        message:'Something Went Wrong...',
+        message: "Something Went Wrong...",
         user: {
           email: email,
         },
@@ -234,7 +334,9 @@ export const forgotPasswordAPI = async (email) => {
     });
 
     if (!response.ok || (data.status !== 200 && data.status !== 201)) {
-      throw new Error(data.message || "User not found. Please check your email address.");
+      throw new Error(
+        data.message || "User not found. Please check your email address."
+      );
     }
 
     return {
@@ -247,17 +349,23 @@ export const forgotPasswordAPI = async (email) => {
     // Log at info level in development if needed
     // console.log("Forgot Password Error:", error);
     // Throw an Error object with the proper message
-    throw new Error(error.message || "User not found or network error occurred");
+    throw new Error(
+      error.message || "User not found or network error occurred"
+    );
   }
 };
 
 // OTP Verification and Password Update API (combined - server updates password during OTP verification)
-export const verifyOtpAndUpdatePasswordAPI = async (email, otp, newPassword) => {
+export const verifyOtpAndUpdatePasswordAPI = async (
+  email,
+  otp,
+  newPassword
+) => {
   try {
     let formData = new FormData();
     formData.append("otp", otp);
     formData.append("email_id", email);
-    
+
     // Include password fields - server updates password during OTP verification
     if (newPassword) {
       formData.append("password", newPassword);
@@ -285,12 +393,18 @@ export const verifyOtpAndUpdatePasswordAPI = async (email, otp, newPassword) => 
     });
 
     if (!response.ok || (data.status !== 200 && data.status !== 201)) {
-      throw new Error(data.message || data.error || "Invalid OTP. Please try again.");
+      throw new Error(
+        data.message || data.error || "Invalid OTP. Please try again."
+      );
     }
 
     return {
       success: true,
-      message: data.message || (newPassword ? "Password updated successfully" : "OTP verified successfully"),
+      message:
+        data.message ||
+        (newPassword
+          ? "Password updated successfully"
+          : "OTP verified successfully"),
       email: email,
       otp: otp,
       passwordUpdated: !!newPassword,
@@ -329,7 +443,9 @@ export const verifyOtpOnlyAPI = async (email, otp) => {
     });
 
     if (!response.ok || (data.status !== 200 && data.status !== 201)) {
-      throw new Error(data.message || data.error || "Invalid OTP. Please try again.");
+      throw new Error(
+        data.message || data.error || "Invalid OTP. Please try again."
+      );
     }
 
     return {
@@ -382,7 +498,11 @@ export const verifyOtpAPI = async (email, otp, newPassword = null) => {
 
     return {
       success: true,
-      message: data.message || (newPassword ? "Password reset successfully" : "OTP verified successfully"),
+      message:
+        data.message ||
+        (newPassword
+          ? "Password reset successfully"
+          : "OTP verified successfully"),
       token: data.token || otp,
       email: email,
       isPasswordReset: !!newPassword,
@@ -401,7 +521,9 @@ export const resetPasswordAPI = async (email, otpToken, newPassword) => {
     return await verifyOtpAndUpdatePasswordAPI(email, otpToken, newPassword);
   } catch (error) {
     // Throw an Error object with the proper message
-    throw new Error(error.message || "Failed to reset password. Please try again.");
+    throw new Error(
+      error.message || "Failed to reset password. Please try again."
+    );
   }
 };
 

@@ -13,9 +13,18 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import * as DocumentPicker from "expo-document-picker";
-import { useSafeAreaInsets, SafeAreaView } from "react-native-safe-area-context";
+import {
+  useSafeAreaInsets,
+  SafeAreaView,
+} from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { uploadFileAPI, deleteFileAPI, saveTicketAPI } from "../services/api";
+import {
+  uploadFileAPI,
+  deleteFileAPI,
+  saveHelpdeskAPI,
+  readUserAPI,
+  getCategoriesAPI,
+} from "../services/api";
 
 const HelpdeskFormScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -39,39 +48,119 @@ const HelpdeskFormScreen = ({ navigation }) => {
   const [showTimeFromPicker, setShowTimeFromPicker] = useState(false);
   const [showTimeToPicker, setShowTimeToPicker] = useState(false);
 
-  const mainCategories = [
-    { id: 1, value: "hostel", text: "Hostel Issues" },
-    { id: 2, value: "it", text: "IT Infrastructure Issues" },
-    { id: 3, value: "food", text: "Food/Mess Issues" },
-    { id: 4, value: "admin", text: "Administration Issues" },
-    { id: 5, value: "other", text: "Other" },
-  ];
+  // Dynamic categories from API
+  const [mainCategories, setMainCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState({});
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
 
-  const subCategories = {
-    hostel: [
-      { id: 11, value: "furniture", text: "Furniture" },
-      { id: 12, value: "plumbing", text: "Plumbing" },
-      { id: 13, value: "electricity", text: "Electricity" },
-      { id: 14, value: "miscellaneous", text: "Miscellaneous" },
-    ],
-    it: [
-      { id: 21, value: "wifi", text: "Wifi Issues" },
-      { id: 22, value: "hardware", text: "Hardware" },
-      { id: 23, value: "software", text: "Software" },
-      { id: 24, value: "miscellaneous", text: "Miscellaneous" },
-    ],
-    food: [
-      { id: 31, value: "cooking", text: "Under/overcooked food" },
-      { id: 32, value: "cleanliness", text: "Unclean dining area" },
-      { id: 33, value: "hygiene", text: "Poor staff hygiene" },
-      { id: 34, value: "miscellaneous", text: "Miscellaneous" },
-    ],
-    admin: [
-      { id: 41, value: "gate", text: "Entry point gate issue" },
-      { id: 42, value: "sewage", text: "Sewerage Issues" },
-      { id: 43, value: "classes", text: "Classes issues" },
-      { id: 44, value: "miscellaneous", text: "Miscellaneous" },
-    ],
+  // Load categories from API on component mount
+  React.useEffect(() => {
+    loadCategories();
+  }, []);
+
+  const formatTime24Hr = (date) => {
+    if (isNaN(date)) {
+      return "";
+    }
+    const hours = date.getHours().toString().padStart(2, "0");
+    const minutes = date.getMinutes().toString().padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
+
+  const formatTime12Hr = (date) => {
+    if (isNaN(date)) {
+      return "";
+    }
+    let hours = date.getHours();
+    let minutes = date.getMinutes().toString().padStart(2, "0");
+    let ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12;
+    hours = hours ? hours : 12; // convert 0 to 12
+    return `${hours.toString().padStart(2, "0")}:${minutes} ${ampm}`;
+  };
+
+  // Load categories from API
+  const loadCategories = async () => {
+    try {
+      setIsLoadingCategories(true);
+      const token = await AsyncStorage.getItem("userToken");
+      if (!token) {
+        Alert.alert(
+          "Error",
+          "Authentication token not found. Please login again."
+        );
+        navigation.goBack();
+        return;
+      }
+
+      const response = await getCategoriesAPI(token);
+      if (response.success && response.categories) {
+        // Transform API response to expected format
+        const apiData = response.categories;
+
+        console.log("Helpdesk Categories API Data:", apiData);
+
+        // The API returns nested structure: { helpdesk: { category: {...}, sub_category: {...} } }
+        const categories = apiData.helpdesk?.category || {};
+        const subCategoriesData = apiData.helpdesk?.sub_category || {};
+
+        console.log("Helpdesk Main Categories from API:", categories);
+        console.log("Helpdesk Sub Categories from API:", subCategoriesData);
+
+        // Parse main categories
+        const mainCats = Object.entries(categories).map(([id, name]) => ({
+          id: parseInt(id),
+          value: name.toLowerCase().replace(/[^a-z0-9]/g, "_"),
+          text: name,
+        }));
+
+        console.log("Parsed Helpdesk Main Categories:", mainCats);
+
+        setMainCategories(mainCats);
+
+        // Parse subcategories from API data
+        const subCats = {};
+
+        // Map main category IDs to their values for subcategory mapping
+        const categoryIdToValue = {};
+        mainCats.forEach((cat) => {
+          categoryIdToValue[cat.id] = cat.value;
+        });
+
+        // Parse subcategories from API response
+        Object.entries(subCategoriesData).forEach(
+          ([categoryId, subCategoryData]) => {
+            const mainCategoryValue = categoryIdToValue[parseInt(categoryId)];
+            if (mainCategoryValue && subCategoryData) {
+              subCats[mainCategoryValue] = Object.entries(subCategoryData).map(
+                ([subId, subName]) => ({
+                  id: parseInt(subId),
+                  value: subName.toLowerCase().replace(/[^a-z0-9]/g, "_"),
+                  text: subName,
+                })
+              );
+            }
+          }
+        );
+
+        console.log("Parsed Helpdesk Sub Categories:", subCats);
+        setSubCategories(subCats);
+      }
+    } catch (error) {
+      console.error("Failed to load helpdesk categories:", error);
+      Alert.alert("Error", "Failed to load categories. Please try again.");
+      // Use fallback categories if API fails
+      setMainCategories([
+        { id: 1, value: "hostel", text: "Hostel Issues" },
+        { id: 2, value: "it", text: "IT Infrastructure Issues" },
+        { id: 3, value: "food", text: "Food/Mess Issues" },
+        { id: 4, value: "admin", text: "Administration Issues" },
+        { id: 5, value: "other", text: "Other" },
+      ]);
+      setSubCategories({});
+    } finally {
+      setIsLoadingCategories(false);
+    }
   };
 
   const handleMainCategorySelect = (category) => {
@@ -120,28 +209,27 @@ const HelpdeskFormScreen = ({ navigation }) => {
         copyToCacheDirectory: true,
       });
 
-     if (!result.canceled && result.assets && result.assets.length > 0) {
-  const file = result.assets[0];
-  
-  // File size validation - 2MB limit
-  const maxSizeInBytes = 2 * 1024 * 1024; // 2MB in bytes
-  if (file.size && file.size > maxSizeInBytes) {
-    const fileSizeInMB = (file.size / (1024 * 1024)).toFixed(2);
-    Alert.alert(
-      "File Too Large", 
-      `The selected file is ${fileSizeInMB}MB. Please choose a file smaller than 2MB.`
-    );
-    return;
-  }
-  
-  setSelectedFile(file);  // store as object, not JSON string
-  setOriginalFileName(file.name); // store original file name for UI display
-  setErrors({ ...errors, file: "" });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
 
-  // Upload file to server
-  await uploadFileToServer(file);
-}
+        // File size validation - 2MB limit
+        const maxSizeInBytes = 2 * 1024 * 1024; // 2MB in bytes
+        if (file.size && file.size > maxSizeInBytes) {
+          const fileSizeInMB = (file.size / (1024 * 1024)).toFixed(2);
+          Alert.alert(
+            "File Too Large",
+            `The selected file is ${fileSizeInMB}MB. Please choose a file smaller than 2MB.`
+          );
+          return;
+        }
 
+        setSelectedFile(file); // store as object, not JSON string
+        setOriginalFileName(file.name); // store original file name for UI display
+        setErrors({ ...errors, file: "" });
+
+        // Upload file to server
+        await uploadFileToServer(file);
+      }
     } catch (error) {
       Alert.alert("Error", "Failed to pick file. Please try again.");
     }
@@ -164,7 +252,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
 
       // Simulate upload progress
       const progressInterval = setInterval(() => {
-        setUploadProgress(prev => {
+        setUploadProgress((prev) => {
           if (prev >= 90) {
             clearInterval(progressInterval);
             return 90; // Stop at 90% until actual upload completes
@@ -173,19 +261,19 @@ const HelpdeskFormScreen = ({ navigation }) => {
         });
       }, 300);
 
-     const response = await uploadFileAPI(file, token);
+      const response = await uploadFileAPI(file, token);
 
       // Complete the progress
       clearInterval(progressInterval);
       setUploadProgress(100);
-      
+
       // Small delay to show 100% completion
       setTimeout(() => {
         setUploadProgress(0);
       }, 500);
 
       if (response.success) {
-        console.log('Upload completed:', response.filename);
+        console.log("Upload completed:", response.filename);
         setUploadedFileName(response.filename);
         // Show success feedback briefly
         Alert.alert("Success", "File uploaded successfully!");
@@ -270,7 +358,12 @@ const HelpdeskFormScreen = ({ navigation }) => {
       newErrors.mainCategory = "Please select a main category";
     }
 
-    if (!subCategory && mainCategory !== "other") {
+    // Only require subcategory if subcategories exist for the selected main category
+    const hasSubCategories =
+      mainCategory &&
+      subCategories[mainCategory] &&
+      subCategories[mainCategory].length > 0;
+    if (hasSubCategories && !subCategory) {
       newErrors.subCategory = "Please select a sub-category";
     }
 
@@ -303,35 +396,40 @@ const HelpdeskFormScreen = ({ navigation }) => {
 
       // Get category and subcategory IDs
       const mainCategoryId = getCategoryId(mainCategory, mainCategories);
-      const subCategoryId = mainCategory === "other" ? null : getSubCategoryId(mainCategory, subCategory);
+      const subCategoryId =
+        mainCategory === "other"
+          ? null
+          : getSubCategoryId(mainCategory, subCategory);
 
-      console.log('Category mapping:', {
+      console.log("Category mapping:", {
         mainCategoryText: mainCategory,
         mainCategoryId: mainCategoryId,
         subCategoryText: subCategory,
-        subCategoryId: subCategoryId
+        subCategoryId: subCategoryId,
+      });
+
+      console.log("Submitting helpdesk ticket:", {
+        mainCategoryText: mainCategory,
+        mainCategoryId: mainCategoryId,
+        subCategoryText: subCategory,
+        subCategoryId: subCategoryId,
       });
 
       // Prepare ticket data with all required fields
       const ticketData = {
         category: mainCategoryId,
-        subCategory: subCategoryId || "",
+        sub_category: subCategoryId || "",
         description: notes,
         docFile: uploadedFileName || "",
-        ticketId: "", // Empty for new tickets
         // Date and time fields
-        availableDate: formatDate(availableDate),
-        availableTimeFrom: formatTime(availableTimeFrom),
-        availableTimeTo: formatTime(availableTimeTo),
-        startDate: formatDate(availableDate), // Use available date as start date
-        startTime: formatTime(availableTimeFrom), // Use available time from as start time
-        endTime: formatTime(availableTimeTo), // Use available time to as end time
-        // Additional fields that server might expect
-        time: formatTime(availableTimeFrom), // Main "time" parameter
-        date: formatDate(availableDate), // Main "date" parameter
+        start_date: availableDate,
+        start_time: formatTime24Hr(availableTimeFrom),
+        end_time: formatTime24Hr(availableTimeTo),
       };
 
-      const response = await saveTicketAPI(ticketData, token);
+      // Call the helpdesk API
+      const response = await saveHelpdeskAPI(ticketData, token);
+      console.log("Helpdesk API Response:", response);
 
       if (response.success) {
         Alert.alert(
@@ -345,8 +443,8 @@ const HelpdeskFormScreen = ({ navigation }) => {
                 setMainCategory("");
                 setSubCategory("");
                 setAvailableDate(new Date());
-                setAvailableTimeFrom(new Date());
-                setAvailableTimeTo(new Date());
+                setAvailableTimeFrom(formatTime24Hr(new Date()));
+                setAvailableTimeTo(formatTime24Hr(new Date()));
                 setNotes("");
                 setSelectedFile(null);
                 setOriginalFileName(null);
@@ -407,8 +505,12 @@ const HelpdeskFormScreen = ({ navigation }) => {
           <View style={styles.categorySection}>
             <Text style={styles.label}>Select Main Category *</Text>
             <TouchableOpacity
-              style={styles.pickerButton}
+              style={[
+                styles.pickerButton,
+                isLoadingCategories && styles.disabledButton,
+              ]}
               onPress={() => setShowMainCategoryPicker(true)}
+              disabled={isLoadingCategories}
             >
               <Text
                 style={[
@@ -416,7 +518,11 @@ const HelpdeskFormScreen = ({ navigation }) => {
                   !mainCategory && styles.placeholderText,
                 ]}
               >
-                {getCategoryText(mainCategory, mainCategories)}
+                {isLoadingCategories
+                  ? "Loading categories..."
+                  : mainCategory
+                  ? getCategoryText(mainCategory, mainCategories)
+                  : "Choose a category"}
               </Text>
               <Ionicons name="chevron-down" size={20} color="#8b5cf6" />
             </TouchableOpacity>
@@ -426,50 +532,61 @@ const HelpdeskFormScreen = ({ navigation }) => {
           </View>
 
           {/* Sub-Category Selection */}
-          {mainCategory !== "other" && (
-            <View style={styles.categorySection}>
-              <Text style={styles.label}>Select Sub-Category *</Text>
-              <TouchableOpacity
-                style={[
-                  styles.pickerButton,
-                  (!mainCategory || mainCategory === "other") &&
-                    styles.disabledButton,
-                ]}
-                onPress={() =>
-                  mainCategory &&
-                  mainCategory !== "other" &&
-                  setShowSubCategoryPicker(true)
-                }
-                disabled={!mainCategory || mainCategory === "other"}
-              >
-                <Text
+          {mainCategory &&
+            subCategories[mainCategory] &&
+            subCategories[mainCategory].length > 0 && (
+              <View style={styles.categorySection}>
+                <Text style={styles.label}>Select Sub-Category *</Text>
+                <TouchableOpacity
                   style={[
-                    styles.pickerText,
-                    !subCategory && styles.placeholderText,
+                    styles.pickerButton,
+                    (isLoadingCategories ||
+                      !mainCategory ||
+                      mainCategory === "other") &&
+                      styles.disabledButton,
                   ]}
-                >
-                  {mainCategory && mainCategory !== "other"
-                    ? getCategoryText(
-                        subCategory,
-                        subCategories[mainCategory] || []
-                      )
-                    : "Choose main category first"}
-                </Text>
-                <Ionicons
-                  name="chevron-down"
-                  size={20}
-                  color={
-                    mainCategory && mainCategory !== "other"
-                      ? "#8b5cf6"
-                      : "#ccc"
+                  onPress={() =>
+                    !isLoadingCategories &&
+                    mainCategory &&
+                    mainCategory !== "other" &&
+                    setShowSubCategoryPicker(true)
                   }
-                />
-              </TouchableOpacity>
-              {errors.subCategory && (
-                <Text style={styles.errorText}>{errors.subCategory}</Text>
-              )}
-            </View>
-          )}
+                  disabled={
+                    isLoadingCategories ||
+                    !mainCategory ||
+                    mainCategory === "other"
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.pickerText,
+                      !subCategory && styles.placeholderText,
+                    ]}
+                  >
+                    {isLoadingCategories
+                      ? "Loading subcategories..."
+                      : mainCategory && mainCategory !== "other"
+                      ? getCategoryText(
+                          subCategory,
+                          subCategories[mainCategory] || []
+                        )
+                      : "Choose main category first"}
+                  </Text>
+                  <Ionicons
+                    name="chevron-down"
+                    size={20}
+                    color={
+                      mainCategory && mainCategory !== "other"
+                        ? "#8b5cf6"
+                        : "#ccc"
+                    }
+                  />
+                </TouchableOpacity>
+                {errors.subCategory && (
+                  <Text style={styles.errorText}>{errors.subCategory}</Text>
+                )}
+              </View>
+            )}
 
           {/* Date and Time Selection */}
           <View style={styles.categorySection}>
@@ -495,7 +612,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
                   onPress={() => setShowTimeFromPicker(true)}
                 >
                   <Text style={styles.dateTimeText}>
-                    {formatTime(availableTimeFrom)}
+                    {formatTime12Hr(availableTimeFrom)}
                   </Text>
                   <Ionicons name="time-outline" size={16} color="#8b5cf6" />
                 </TouchableOpacity>
@@ -508,7 +625,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
                   onPress={() => setShowTimeToPicker(true)}
                 >
                   <Text style={styles.dateTimeText}>
-                    {formatTime(availableTimeTo)}
+                    {formatTime12Hr(availableTimeTo)}
                   </Text>
                   <Ionicons name="time-outline" size={16} color="#8b5cf6" />
                 </TouchableOpacity>
@@ -570,11 +687,11 @@ const HelpdeskFormScreen = ({ navigation }) => {
                 {isUploading && (
                   <View style={styles.progressContainer}>
                     <View style={styles.progressBar}>
-                      <View 
+                      <View
                         style={[
-                          styles.progressFill, 
-                          { width: `${uploadProgress}%` }
-                        ]} 
+                          styles.progressFill,
+                          { width: `${uploadProgress}%` },
+                        ]}
                       />
                     </View>
                   </View>
@@ -590,7 +707,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
                     style={styles.fileIcon}
                   />
                   <Text style={styles.selectedFileName} numberOfLines={1}>
-                    {originalFileName || selectedFile?.name || 'Unknown file'}
+                    {originalFileName || selectedFile?.name || "Unknown file"}
                   </Text>
                   <TouchableOpacity
                     style={[

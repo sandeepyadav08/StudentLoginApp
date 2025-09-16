@@ -232,7 +232,7 @@ const GrievanceFormScreen = ({ navigation }) => {
         const day = String(date.getDate()).padStart(2, '0');
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const year = date.getFullYear();
-        return `${day}/${month}/${year}`;
+        return `${day}-${month}-${year}`;
       };
 
       const grievanceData = {
@@ -247,7 +247,6 @@ const GrievanceFormScreen = ({ navigation }) => {
         query_type: 'grievance'
       };
 
-      console.log('Submitting grievance:', grievanceData);
 
       // Call the API
       const response = await saveGrievanceAPI(grievanceData, token);
