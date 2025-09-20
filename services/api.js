@@ -37,7 +37,7 @@ export const readUserAPI = async (token) => {
   }
 };
 
-// Get Categories API
+// Get Categories API (Generic - returns both grievance and helpdesk)
 export const getCategoriesAPI = async (token) => {
   try {
     const response = await fetch(`${API_BASE_URL}/get-category`, {
@@ -68,6 +68,74 @@ export const getCategoriesAPI = async (token) => {
   } catch (error) {
     console.error("Get Categories Error:", error);
     throw new Error(error.message || "Failed to fetch categories");
+  }
+};
+
+// Get Grievance Categories API
+export const getGrievanceCategoriesAPI = async (token) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/get-category?page=grievance`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await response.json();
+
+    console.log("Get Grievance Categories Response:", {
+      status: response.status,
+      ok: response.ok,
+      data: data,
+    });
+
+    if (!response.ok || (data.status !== 200 && data.status !== 201)) {
+      throw new Error(data.message || "Failed to fetch grievance categories");
+    }
+
+    return {
+      success: true,
+      categories: data.res || data.categories || data.data,
+      message: data.message || "Grievance categories fetched successfully",
+    };
+  } catch (error) {
+    console.error("Get Grievance Categories Error:", error);
+    throw new Error(error.message || "Failed to fetch grievance categories");
+  }
+};
+
+// Get Helpdesk Categories API
+export const getHelpdeskCategoriesAPI = async (token) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/get-category?page=helpdesk`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await response.json();
+
+    console.log("Get Helpdesk Categories Response:", {
+      status: response.status,
+      ok: response.ok,
+      data: data,
+    });
+
+    if (!response.ok || (data.status !== 200 && data.status !== 201)) {
+      throw new Error(data.message || "Failed to fetch helpdesk categories");
+    }
+
+    return {
+      success: true,
+      categories: data.res || data.categories || data.data,
+      message: data.message || "Helpdesk categories fetched successfully",
+    };
+  } catch (error) {
+    console.error("Get Helpdesk Categories Error:", error);
+    throw new Error(error.message || "Failed to fetch helpdesk categories");
   }
 };
 
@@ -971,6 +1039,148 @@ export const saveTicketAPI = async (ticketData, token) => {
       success: false,
       message: error.message || "Network error occurred",
     };
+  }
+};
+
+// Get Grievances API
+export const getGrievancesAPI = async (token, page = 0, limit = 10) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/grievance-list`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const responseText = await response.text();
+    let data;
+
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse grievances response:", responseText);
+      // Try to handle plain text response
+      if (response.ok) {
+        return {
+          success: true,
+          grievances: [],
+          message: "No grievances found",
+          total: 0,
+        };
+      }
+      throw new Error("Invalid server response: " + responseText.slice(0, 100));
+    }
+
+    console.log("Get Grievances Response:", {
+      status: response.status,
+      ok: response.ok,
+      data: data,
+    });
+
+    if (!response.ok || (data.status !== 200 && data.status !== 201)) {
+      throw new Error(data.message || "Failed to fetch grievances");
+    }
+    
+    const rawGrievances = data.data || [];
+    
+    // Transform the grievance data to a consistent format - using only required fields
+    const grievances = rawGrievances.map((grievance, index) => {
+      return {
+        id: grievance.id || index + 1,
+        queryType: grievance.query_type || "Unknown",
+        subType: grievance.sub_type || "",
+        description: grievance.description || "No description",
+        status: grievance.status || "0",
+        datetime: grievance.datetime || "",
+        createdAt: grievance.created_at || "",
+        updatedBy: grievance.updated_by || "",
+      };
+    });
+
+    return {
+      success: true,
+      grievances: grievances,
+      message: data.message || "Grievances fetched successfully",
+      total: data.recordsTotal || data.total || grievances.length,
+      recordsFiltered: data.recordsFiltered || grievances.length,
+    };
+  } catch (error) {
+    console.error("Get Grievances Error:", error);
+    throw new Error(error.message || "Failed to fetch grievances");
+  }
+};
+
+// Get Helpdesk Tickets API
+export const getHelpdeskTicketsAPI = async (token, page = 0, limit = 10) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/helpdesk-list`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const responseText = await response.text();
+    let data;
+
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse tickets response:", responseText);
+      // Try to handle plain text response
+      if (response.ok) {
+        return {
+          success: true,
+          tickets: [],
+          message: "No tickets found",
+          total: 0,
+        };
+      }
+      throw new Error("Invalid server response: " + responseText.slice(0, 100));
+    }
+
+    console.log("Get Helpdesk Tickets Response:", {
+      status: response.status,
+      ok: response.ok,
+      data: data,
+    });
+
+    if (!response.ok || (data.status !== 200 && data.status !== 201)) {
+      throw new Error(data.message || "Failed to fetch helpdesk tickets");
+    }
+
+    // Handle the specific response structure from helpdesk-list API
+    const rawTickets = data.data || [];
+    
+    // Transform the ticket data to a consistent format - using only required fields
+    const tickets = rawTickets.map((ticket, index) => {
+      return {
+        id: ticket.id || index + 1,
+        ticketId: ticket.ticket_id || `#${ticket.id || index + 1}`,
+        category: ticket.category || "Unknown",
+        subCategory: ticket.sub_category || "",
+        description: ticket.description || "No description",
+        status: ticket.status || "0",
+        startDatetime: ticket.start_datetime || "",
+        endDatetime: ticket.end_datetime || "",
+        docFile: ticket.doc_file || "",
+        createdAt: ticket.created_at || "",
+        createdBy: ticket.created_by || "",
+      };
+    });
+
+    return {
+      success: true,
+      tickets: tickets,
+      message: data.message || "Helpdesk tickets fetched successfully",
+      total: data.recordsTotal || data.total || tickets.length,
+      recordsFiltered: data.recordsFiltered || tickets.length,
+    };
+  } catch (error) {
+    console.error("Get Helpdesk Tickets Error:", error);
+    throw new Error(error.message || "Failed to fetch helpdesk tickets");
   }
 };
 

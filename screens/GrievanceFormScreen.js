@@ -82,21 +82,14 @@ const GrievanceFormScreen = ({ navigation }) => {
       }
 
       const response = await readUserAPI(token);
-      console.log('User API Response:', response);
       if (response.success && response.user) {
         const user = response.user;
-        console.log('User Data:', user);
         // Auto-fill form fields with user data
         setName(user.name || "");
         setMobileNo(user.mobile || user.phone || "");
         setEmail(user.email || "");
         setRollNo(user.roll_no || user.student_id || user.rollNo || "");
-        console.log('Form fields set:', {
-          name: user.name,
-          mobile: user.mobile || user.phone,
-          email: user.email,
-          roll_no: user.roll_no
-        });
+        console.log('GRIEVANCE: User data loaded and form auto-filled');
       }
     } catch (error) {
       console.error("Failed to load user data:", error);
@@ -122,14 +115,11 @@ const GrievanceFormScreen = ({ navigation }) => {
         // Transform API response to expected format
         const apiData = response.categories;
         
-        console.log('Categories API Data:', apiData);
-        
-        // The API returns nested structure: { grievance: { category: {...}, sub_category: {...} } }
+        // Show only grievance categories
         const categories = apiData.grievance?.category || {};
         const subCategoriesData = apiData.grievance?.sub_category || {};
         
-        console.log('Main Categories from API:', categories);
-        console.log('Sub Categories from API:', subCategoriesData);
+        console.log('GRIEVANCE: Category names from API:', Object.values(categories));
         
         // Parse main categories
         const mainCats = Object.entries(categories).map(([id, name]) => ({
@@ -137,10 +127,6 @@ const GrievanceFormScreen = ({ navigation }) => {
           value: name.toLowerCase().replace(/[^a-z0-9]/g, '_'),
           text: name
         }));
-        
-        console.log('Parsed Main Categories:', mainCats);
-        
-        setMainCategories(mainCats);
         
         // Parse subcategories from API data
         const subCats = {};
@@ -163,8 +149,10 @@ const GrievanceFormScreen = ({ navigation }) => {
           }
         });
         
-        console.log('Parsed Sub Categories:', subCats);
+        setMainCategories(mainCats);
         setSubCategories(subCats);
+        
+        console.log('GRIEVANCE: Categories loaded - Main:', mainCats.length, 'Sub:', Object.keys(subCats).length);
       }
     } catch (error) {
       console.error("Failed to load categories:", error);

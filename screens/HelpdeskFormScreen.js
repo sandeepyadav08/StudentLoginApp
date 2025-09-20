@@ -98,14 +98,11 @@ const HelpdeskFormScreen = ({ navigation }) => {
         // Transform API response to expected format
         const apiData = response.categories;
 
-        console.log("Helpdesk Categories API Data:", apiData);
-
-        // The API returns nested structure: { helpdesk: { category: {...}, sub_category: {...} } }
+        // Show only helpdesk categories
         const categories = apiData.helpdesk?.category || {};
         const subCategoriesData = apiData.helpdesk?.sub_category || {};
 
-        console.log("Helpdesk Main Categories from API:", categories);
-        console.log("Helpdesk Sub Categories from API:", subCategoriesData);
+        console.log('HELPDESK: Category names from API:', Object.values(categories));
 
         // Parse main categories
         const mainCats = Object.entries(categories).map(([id, name]) => ({
@@ -113,10 +110,6 @@ const HelpdeskFormScreen = ({ navigation }) => {
           value: name.toLowerCase().replace(/[^a-z0-9]/g, "_"),
           text: name,
         }));
-
-        console.log("Parsed Helpdesk Main Categories:", mainCats);
-
-        setMainCategories(mainCats);
 
         // Parse subcategories from API data
         const subCats = {};
@@ -143,8 +136,10 @@ const HelpdeskFormScreen = ({ navigation }) => {
           }
         );
 
-        console.log("Parsed Helpdesk Sub Categories:", subCats);
+        setMainCategories(mainCats);
         setSubCategories(subCats);
+        
+        console.log("HELPDESK: Categories loaded - Main:", mainCats.length, "Sub:", Object.keys(subCats).length);
       }
     } catch (error) {
       console.error("Failed to load helpdesk categories:", error);
