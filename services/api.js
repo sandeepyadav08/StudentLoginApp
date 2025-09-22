@@ -1078,6 +1078,17 @@ export const getGrievancesAPI = async (token, page = 0, limit = 10) => {
       data: data,
     });
 
+    // Handle "No data Found" case - this is not an error, just empty data
+    if (data.status === 400 && data.msg && data.msg.includes("No data Found")) {
+      return {
+        success: true,
+        grievances: [],
+        message: "No grievances found",
+        total: 0,
+        recordsFiltered: 0,
+      };
+    }
+
     if (!response.ok || (data.status !== 200 && data.status !== 201)) {
       throw new Error(data.message || "Failed to fetch grievances");
     }
@@ -1146,6 +1157,17 @@ export const getHelpdeskTicketsAPI = async (token, page = 0, limit = 10) => {
       ok: response.ok,
       data: data,
     });
+
+    // Handle "No data Found" case - this is not an error, just empty data
+    if (data.status === 400 && data.msg && data.msg.includes("No data Found")) {
+      return {
+        success: true,
+        tickets: [],
+        message: "No tickets found",
+        total: 0,
+        recordsFiltered: 0,
+      };
+    }
 
     if (!response.ok || (data.status !== 200 && data.status !== 201)) {
       throw new Error(data.message || "Failed to fetch helpdesk tickets");
