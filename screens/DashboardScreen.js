@@ -141,6 +141,8 @@ export default function DashboardScreen({ navigation }) {
                 navigation.navigate('Helpdesk');
               } else if (item === 'Grievance') {
                 navigation.navigate('Grievance');
+              } else if (item === 'Utility') {
+                navigation.navigate('UtilityForm');
               } else {
                 Alert.alert('Navigation', `Navigate to ${item}`);
               }

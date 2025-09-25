@@ -675,6 +675,52 @@ export const getPaymentHistoryAPI = async (token, paymentStatus = "") => {
   }
 };
 
+// Get Utility Amount API
+export const getUtilityAmountAPI = async (token, subUtility, months = 1, startDate = null, endDate = null, membershipType = null, utilityId = null) => {
+  const formData = new FormData();
+  formData.append("sub_utility", subUtility);
+  formData.append("months", months);
+  if (startDate) formData.append("start_date", startDate);
+  if (endDate) formData.append("end_date", endDate);
+  if (membershipType) formData.append("membership_type", membershipType);
+  if (utilityId) formData.append("id", utilityId);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/get-utility-amount`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: formData,
+    });
+
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(
+        "Server did not return valid JSON: " + text.slice(0, 100)
+      );
+    }
+
+    if (!response.ok || data.status !== 200) {
+      throw new Error(data.message || "Failed to fetch utility amount");
+    }
+
+    return {
+      success: true,
+      amount: parseInt(data.price) || data.res || 0,
+      message: data.message,
+    };
+  } catch (error) {
+    throw {
+      success: false,
+      message: error.message || "Network error occurred",
+    };
+  }
+};
+
 // Get-utility-detail API
 export const getPaymentDetailsAPI = async (token, paymentId) => {
   const formData = new FormData();
