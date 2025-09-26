@@ -213,21 +213,47 @@ const UtilityFormScreen = ({ navigation }) => {
 
   // getPaymentAmount function removed - amounts now come from API
 
+  // Annual Membership Date Logic - 12 full months (same as monthly logic with months=12)
+  // End date is the last day of the month preceding the same day next year.
+  // Example: Start: 26-09-2025 -> End: 31-08-2026
+  const calculateAnnualMembershipDates = (startDate) => {
+    const currentStartDate = new Date(startDate);
+
+    // Clone and move 12 months ahead, then set date to 0 to get
+    // the last day of the previous month (full months logic)
+    const endDate = new Date(currentStartDate);
+    endDate.setMonth(endDate.getMonth() + 12);
+    endDate.setDate(0);
+    endDate.setHours(23, 59, 59, 999);
+
+    return {
+      startDate: currentStartDate,
+      endDate: endDate,
+    };
+  };
+
   const calculateEndDate = (startDate, paymentType, months = 1) => {
     const newEndDate = new Date(startDate);
     
     switch (paymentType) {
       case 'daily':
-        newEndDate.setDate(newEndDate.getDate() + 1);
+        // For daily: End at 11:59:59 PM of the same day
+        newEndDate.setHours(23, 59, 59, 999);
         break;
       case 'monthly':
+        // For monthly: End at last day of the target month
         newEndDate.setMonth(newEndDate.getMonth() + months);
+        // Set to last day of the month
+        newEndDate.setDate(0); // This sets to last day of previous month (which is our target month)
+        newEndDate.setHours(23, 59, 59, 999);
         break;
       case 'yearly':
-        newEndDate.setFullYear(newEndDate.getFullYear() + 1);
-        break;
+        // For yearly: Use academic year logic (September 26th to August 31st)
+        const academicDates = calculateAnnualMembershipDates(startDate);
+        return academicDates.endDate;
       default:
-        newEndDate.setDate(newEndDate.getDate() + 1);
+        // Default to daily
+        newEndDate.setHours(23, 59, 59, 999);
     }
     
     return newEndDate;
@@ -287,18 +313,30 @@ const UtilityFormScreen = ({ navigation }) => {
       setSwimmingPoolMonths(1);
     }
     
-    // Calculate correct end date first
-    const months = option.value === 'monthly' ? swimmingPoolMonths : 1;
-    const newEndDate = calculateEndDate(swimmingPoolStartDate, option.value, months);
+    let updatedStartDate = swimmingPoolStartDate;
+    let newEndDate;
+    
+    if (option.value === 'yearly') {
+      // For annual payments, calculate end date based on current start date
+      const annualDates = calculateAnnualMembershipDates(swimmingPoolStartDate);
+      newEndDate = annualDates.endDate;
+      // Keep the current start date, don't change it
+    } else {
+      // Calculate correct end date for daily/monthly
+      const months = option.value === 'monthly' ? swimmingPoolMonths : 1;
+      newEndDate = calculateEndDate(swimmingPoolStartDate, option.value, months);
+    }
+    
     setSwimmingPoolEndDate(newEndDate);
     
     // Fetch amount from API
     try {
       setIsSwimmingPoolAmountLoading(true);
+      const months = option.value === 'monthly' ? swimmingPoolMonths : 1;
       const amount = await fetchUtilityAmount(
         option.apiValue, 
         months, 
-        swimmingPoolStartDate, 
+        updatedStartDate, 
         newEndDate,
         SWIMMING_POOL_ID
       );
@@ -323,18 +361,30 @@ const UtilityFormScreen = ({ navigation }) => {
       setGymMonths(1);
     }
     
-    // Calculate correct end date first
-    const months = option.value === 'monthly' ? gymMonths : 1;
-    const newEndDate = calculateEndDate(gymStartDate, option.value, months);
+    let updatedStartDate = gymStartDate;
+    let newEndDate;
+    
+    if (option.value === 'yearly') {
+      // For annual payments, calculate end date based on current start date
+      const annualDates = calculateAnnualMembershipDates(gymStartDate);
+      newEndDate = annualDates.endDate;
+      // Keep the current start date, don't change it
+    } else {
+      // Calculate correct end date for daily/monthly
+      const months = option.value === 'monthly' ? gymMonths : 1;
+      newEndDate = calculateEndDate(gymStartDate, option.value, months);
+    }
+    
     setGymEndDate(newEndDate);
     
     // Fetch amount from API
     try {
       setIsGymAmountLoading(true);
+      const months = option.value === 'monthly' ? gymMonths : 1;
       const amount = await fetchUtilityAmount(
         option.apiValue, 
         months, 
-        gymStartDate, 
+        updatedStartDate, 
         newEndDate,
         GYM_ID
       );
@@ -357,8 +407,16 @@ const UtilityFormScreen = ({ navigation }) => {
           
           // Auto-update end date if payment type is selected
           if (swimmingPoolPaymentType) {
-            const months = swimmingPoolPaymentType === 'monthly' ? swimmingPoolMonths : 1;
-            const newEndDate = calculateEndDate(selectedDate, swimmingPoolPaymentType, months);
+            let newEndDate;
+            if (swimmingPoolPaymentType === 'yearly') {
+              // For annual payments, calculate end date as 1 year minus 1 day
+              const annualDates = calculateAnnualMembershipDates(selectedDate);
+              newEndDate = annualDates.endDate;
+            } else {
+              // For daily/monthly payments
+              const months = swimmingPoolPaymentType === 'monthly' ? swimmingPoolMonths : 1;
+              newEndDate = calculateEndDate(selectedDate, swimmingPoolPaymentType, months);
+            }
             setSwimmingPoolEndDate(newEndDate);
           }
           break;
@@ -372,8 +430,16 @@ const UtilityFormScreen = ({ navigation }) => {
           
           // Auto-update end date if payment type is selected
           if (gymPaymentType) {
-            const months = gymPaymentType === 'monthly' ? gymMonths : 1;
-            const newEndDate = calculateEndDate(selectedDate, gymPaymentType, months);
+            let newEndDate;
+            if (gymPaymentType === 'yearly') {
+              // For annual payments, calculate end date as 1 year minus 1 day
+              const annualDates = calculateAnnualMembershipDates(selectedDate);
+              newEndDate = annualDates.endDate;
+            } else {
+              // For daily/monthly payments
+              const months = gymPaymentType === 'monthly' ? gymMonths : 1;
+              newEndDate = calculateEndDate(selectedDate, gymPaymentType, months);
+            }
             setGymEndDate(newEndDate);
           }
           break;
