@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 import {
   StyleSheet,
   Text,
@@ -10,17 +10,17 @@ import {
   ActivityIndicator,
   Dimensions,
   Modal,
-  ScrollView
-} from 'react-native';
-import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
-import { StatusBar } from 'expo-status-bar';
-import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Picker } from '@react-native-picker/picker';
-import { getPaymentHistoryAPI, getPaymentDetailsAPI } from '../services/api';
-import { WebView } from 'react-native-webview';
-
-const { width } = Dimensions.get('window');
+} from "react-native";
+import {
+  useSafeAreaInsets,
+  SafeAreaView,
+} from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Picker } from "@react-native-picker/picker";
+import { getPaymentHistoryAPI, getPaymentDetailsAPI } from "../services/api";
+import { WebView } from "react-native-webview";
 
 // Responsive utility functions
 const getResponsiveSize = (baseSize, screenWidth) => {
@@ -36,14 +36,17 @@ const getResponsivePadding = (basePadding, screenWidth) => {
 
 export default function PaymentHistoryScreen({ navigation }) {
   const insets = useSafeAreaInsets();
-  const { width: screenWidth } = Dimensions.get('window');
-  
+  const { width: screenWidth } = Dimensions.get("window");
+
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState("");
-  
+  const [hasMore, setHasMore] = useState(true);
+  const [currentPage, setCurrentPage] = useState(0);
+
   // Modal states
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedPayment, setSelectedPayment] = useState(null);
@@ -51,48 +54,79 @@ export default function PaymentHistoryScreen({ navigation }) {
   const [detailsLoading, setDetailsLoading] = useState(false);
 
   useEffect(() => {
-    loadPaymentHistory(statusFilter);
+    setCurrentPage(0);
+    setHasMore(true);
+    setPaymentHistory([]);
+    setLoading(true);
+    loadPaymentHistory(statusFilter, true);
   }, [statusFilter]);
 
-  const loadPaymentHistory = async (filter = "") => {
+  const loadPaymentHistory = async (filter = "", reset = true) => {
     try {
       setError(null);
-      const token = await AsyncStorage.getItem('userToken');
-      
+      const token = await AsyncStorage.getItem("userToken");
+
       if (!token) {
-        Alert.alert('Error', 'No authentication token found');
-        navigation.replace('Login');
+        Alert.alert("Error", "No authentication token found");
+        navigation.replace("Login");
         return;
       }
 
-      const response = await getPaymentHistoryAPI(token, filter);
-      setPaymentHistory(response.data);
-      console.log(response.data)
+      const pageSize = 20;
+      const startIndex = reset ? 0 : currentPage * pageSize;
+
+      // Load payment history from backend API with pagination
+      const response = await getPaymentHistoryAPI(
+        token,
+        filter,
+        startIndex,
+        pageSize
+      );
+      const paymentData = response.data || [];
+
+      if (reset) {
+        setPaymentHistory(paymentData);
+        setCurrentPage(1);
+      } else {
+        setPaymentHistory((prev) => [...prev, ...paymentData]);
+        setCurrentPage((prev) => prev + 1);
+      }
+
+      setHasMore(response.hasMore && paymentData.length === pageSize);
+      console.log("Payment history from backend:", paymentData);
     } catch (error) {
-      console.error('Payment history error:', error);
+      console.error("Payment history error:", error);
       setError(error.message);
-      Alert.alert('Error', error.message);
+      Alert.alert("Error", error.message);
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
+  };
+
+  const loadMorePayments = async () => {
+    if (loadingMore || !hasMore) return;
+
+    setLoadingMore(true);
+    await loadPaymentHistory(statusFilter, false);
   };
 
   // Function to load payment details
   const loadPaymentDetails = async (paymentId) => {
     try {
       setDetailsLoading(true);
-      const token = await AsyncStorage.getItem('userToken');
-      
+      const token = await AsyncStorage.getItem("userToken");
+
       if (!token) {
-        Alert.alert('Error', 'No authentication token found');
+        Alert.alert("Error", "No authentication token found");
         return;
       }
 
       const response = await getPaymentDetailsAPI(token, paymentId);
       setPaymentDetails(response);
     } catch (error) {
-      console.error('Payment details error:', error);
-      Alert.alert('Error', 'Failed to load payment details');
+      console.error("Payment details error:", error);
+      Alert.alert("Error", "Failed to load payment details");
     } finally {
       setDetailsLoading(false);
     }
@@ -107,7 +141,9 @@ export default function PaymentHistoryScreen({ navigation }) {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadPaymentHistory(statusFilter);
+    setCurrentPage(0);
+    setHasMore(true);
+    await loadPaymentHistory(statusFilter, true);
     setRefreshing(false);
   };
 
@@ -118,30 +154,46 @@ export default function PaymentHistoryScreen({ navigation }) {
     if (m) {
       const [, dd, mm, yyyy] = m;
       const date = new Date(Number(yyyy), Number(mm) - 1, Number(dd));
-      return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      return date.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
     }
     const d = new Date(dateString);
     if (!isNaN(d.getTime())) {
-      return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+      return d.toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
     }
     return dateString;
   };
 
   const formatAmount = (amount) => {
-    const n = typeof amount === 'string' ? Number(amount) : amount;
-    if (typeof n === 'number' && !isNaN(n)) {
-      return `₹${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const n = typeof amount === "string" ? Number(amount) : amount;
+    if (typeof n === "number" && !isNaN(n)) {
+      return `₹${n.toLocaleString("en-IN", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })}`;
     }
     return `₹${amount}`;
   };
 
   const getStatusColor = (status) => {
     switch (String(status)) {
-      case "Success": return '#16a34a';
-      case "Pending": return '#d97706';
-      case "Fail": return '#dc2626';
-      case "Processing": return '#0ea5e9';
-      default: return '#6b7280';
+      case "Success":
+        return "#16a34a";
+      case "Pending":
+        return "#d97706";
+      case "Fail":
+        return "#dc2626";
+      case "Processing":
+        return "#0ea5e9";
+      default:
+        return "#6b7280";
     }
   };
 
@@ -212,40 +264,78 @@ export default function PaymentHistoryScreen({ navigation }) {
   };
 
   const renderPaymentItem = ({ item, index }) => (
-    <TouchableOpacity 
-      style={[styles.paymentItem, {
-        marginHorizontal: getResponsivePadding(16, screenWidth),
-        marginBottom: getResponsivePadding(12, screenWidth),
-        padding: getResponsivePadding(16, screenWidth)
-      }]}
+    <TouchableOpacity
+      style={[
+        styles.paymentItem,
+        {
+          marginHorizontal: getResponsivePadding(16, screenWidth),
+          marginBottom: getResponsivePadding(12, screenWidth),
+          padding: getResponsivePadding(16, screenWidth),
+        },
+      ]}
       onPress={() => handlePaymentPress(item)}
       activeOpacity={0.7}
     >
       <View style={styles.paymentHeader}>
         <View style={styles.paymentLeft}>
-          <Text style={[styles.paymentId, { fontSize: getResponsiveSize(14, screenWidth) }]}>
+          <Text
+            style={[
+              styles.paymentId,
+              { fontSize: getResponsiveSize(14, screenWidth) },
+            ]}
+          >
             #{item.id || item.transaction_id || `PAY-${index + 1}`}
           </Text>
-          <Text style={[styles.paymentDate, { fontSize: getResponsiveSize(12, screenWidth) }]}>
+          <Text
+            style={[
+              styles.paymentDate,
+              { fontSize: getResponsiveSize(12, screenWidth) },
+            ]}
+          >
             {formatDate(item.date || item.payment_date || item.created_at)}
           </Text>
         </View>
-        <Text style={[styles.paymentAmount, { fontSize: getResponsiveSize(16, screenWidth) }]}>
+        <Text
+          style={[
+            styles.paymentAmount,
+            { fontSize: getResponsiveSize(16, screenWidth) },
+          ]}
+        >
           {formatAmount(item.amount || item.payment_amount || 0)}
         </Text>
       </View>
-      
+
       <View style={styles.paymentDetails}>
-        <Text style={[styles.paymentDescription, { fontSize: getResponsiveSize(14, screenWidth) }]}>
-          {item.for_payment || item.payment_description || item.purpose || 'NA'}
+        <Text
+          style={[
+            styles.paymentDescription,
+            { fontSize: getResponsiveSize(14, screenWidth) },
+          ]}
+        >
+          {item.for_payment || item.payment_description || item.purpose || "NA"}
         </Text>
-        <View style={[styles.statusContainer, { backgroundColor: `${getStatusColor(item)}20` }]}>
-          <View style={[styles.statusIndicator, { backgroundColor: getStatusColor(item.status) }]} />
-          <Text style={[styles.statusText, { 
-            color: getStatusColor(item.status),
-            fontSize: getResponsiveSize(12, screenWidth)
-          }]}>
-            {item.status_label || item.status || 'Completed'}
+        <View
+          style={[
+            styles.statusContainer,
+            { backgroundColor: `${getStatusColor(item)}20` },
+          ]}
+        >
+          <View
+            style={[
+              styles.statusIndicator,
+              { backgroundColor: getStatusColor(item.status) },
+            ]}
+          />
+          <Text
+            style={[
+              styles.statusText,
+              {
+                color: getStatusColor(item.status),
+                fontSize: getResponsiveSize(12, screenWidth),
+              },
+            ]}
+          >
+            {item.status_label || item.status || "Completed"}
           </Text>
         </View>
       </View>
@@ -253,13 +343,18 @@ export default function PaymentHistoryScreen({ navigation }) {
       {(item.payment_method || item.bank_name) && (
         <View style={styles.paymentMethod}>
           <Ionicons name="card-outline" size={16} color="#6b7280" />
-          <Text style={[styles.methodText, { fontSize: getResponsiveSize(12, screenWidth) }]}>
-            {item.transaction_id || 'N/A'}
-            {item.bank_name ? ` • ${item.bank_name}` : ''}
+          <Text
+            style={[
+              styles.methodText,
+              { fontSize: getResponsiveSize(12, screenWidth) },
+            ]}
+          >
+            {item.transaction_id || "N/A"}
+            {item.bank_name ? ` • ${item.bank_name}` : ""}
           </Text>
         </View>
       )}
-      
+
       {/* Add a small indicator that the card is clickable */}
       <View style={styles.clickIndicator}>
         <Ionicons name="chevron-forward" size={16} color="#9ca3af" />
@@ -313,7 +408,11 @@ export default function PaymentHistoryScreen({ navigation }) {
             />
           ) : (
             <View style={styles.noDetailsContainer}>
-              <Ionicons name="document-text-outline" size={64} color="#9ca3af" />
+              <Ionicons
+                name="document-text-outline"
+                size={64}
+                color="#9ca3af"
+              />
               <Text style={styles.noDetailsText}>No details available</Text>
             </View>
           )}
@@ -325,10 +424,20 @@ export default function PaymentHistoryScreen({ navigation }) {
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Ionicons name="receipt-outline" size={64} color="#9ca3af" />
-      <Text style={[styles.emptyTitle, { fontSize: getResponsiveSize(18, screenWidth) }]}>
+      <Text
+        style={[
+          styles.emptyTitle,
+          { fontSize: getResponsiveSize(18, screenWidth) },
+        ]}
+      >
         No Payment History
       </Text>
-      <Text style={[styles.emptySubtitle, { fontSize: getResponsiveSize(14, screenWidth) }]}>
+      <Text
+        style={[
+          styles.emptySubtitle,
+          { fontSize: getResponsiveSize(14, screenWidth) },
+        ]}
+      >
         Your payment transactions will appear here
       </Text>
     </View>
@@ -337,13 +446,26 @@ export default function PaymentHistoryScreen({ navigation }) {
   const renderError = () => (
     <View style={styles.errorState}>
       <Ionicons name="alert-circle-outline" size={64} color="#dc2626" />
-      <Text style={[styles.errorTitle, { fontSize: getResponsiveSize(18, screenWidth) }]}>
+      <Text
+        style={[
+          styles.errorTitle,
+          { fontSize: getResponsiveSize(18, screenWidth) },
+        ]}
+      >
         Failed to Load
       </Text>
-      <Text style={[styles.errorSubtitle, { fontSize: getResponsiveSize(14, screenWidth) }]}>
+      <Text
+        style={[
+          styles.errorSubtitle,
+          { fontSize: getResponsiveSize(14, screenWidth) },
+        ]}
+      >
         {error}
       </Text>
-      <TouchableOpacity style={styles.retryButton} onPress={() => loadPaymentHistory(statusFilter)}>
+      <TouchableOpacity
+        style={styles.retryButton}
+        onPress={() => loadPaymentHistory(statusFilter)}
+      >
         <Text style={styles.retryButtonText}>Retry</Text>
       </TouchableOpacity>
     </View>
@@ -354,22 +476,40 @@ export default function PaymentHistoryScreen({ navigation }) {
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="dark" />
         <View style={styles.container}>
-          <View style={[styles.header, {
-            paddingHorizontal: getResponsivePadding(16, screenWidth),
-            paddingVertical: getResponsivePadding(15, screenWidth)
-          }]}>
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <View
+            style={[
+              styles.header,
+              {
+                paddingHorizontal: getResponsivePadding(16, screenWidth),
+                paddingVertical: getResponsivePadding(15, screenWidth),
+              },
+            ]}
+          >
+            <TouchableOpacity
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
               <Ionicons name="arrow-back" size={24} color="#7c3aed" />
             </TouchableOpacity>
-            <Text style={[styles.headerTitle, { fontSize: getResponsiveSize(18, screenWidth) }]}>
+            <Text
+              style={[
+                styles.headerTitle,
+                { fontSize: getResponsiveSize(18, screenWidth) },
+              ]}
+            >
               Payment History
             </Text>
             <View style={styles.placeholder} />
           </View>
-          
+
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color="#7c3aed" />
-            <Text style={[styles.loadingText, { fontSize: getResponsiveSize(16, screenWidth) }]}>
+            <Text
+              style={[
+                styles.loadingText,
+                { fontSize: getResponsiveSize(16, screenWidth) },
+              ]}
+            >
               Loading payment history...
             </Text>
           </View>
@@ -382,29 +522,50 @@ export default function PaymentHistoryScreen({ navigation }) {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="dark" />
       <View style={styles.container}>
-        
         {/* Header */}
-        <View style={[styles.header, {
-          paddingHorizontal: getResponsivePadding(16, screenWidth),
-          paddingVertical: getResponsivePadding(15, screenWidth)
-        }]}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <View
+          style={[
+            styles.header,
+            {
+              paddingHorizontal: getResponsivePadding(16, screenWidth),
+              paddingVertical: getResponsivePadding(15, screenWidth),
+            },
+          ]}
+        >
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
             <Ionicons name="arrow-back" size={24} color="#7c3aed" />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { fontSize: getResponsiveSize(18, screenWidth) }]}>
+          <Text
+            style={[
+              styles.headerTitle,
+              { fontSize: getResponsiveSize(18, screenWidth) },
+            ]}
+          >
             Payment History
           </Text>
-          <TouchableOpacity style={styles.refreshHeaderButton} onPress={onRefresh}>
+          <TouchableOpacity
+            style={styles.refreshHeaderButton}
+            onPress={onRefresh}
+          >
             <Ionicons name="refresh" size={24} color="#7c3aed" />
           </TouchableOpacity>
         </View>
 
         {/* Filter Dropdown */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#fff' }}>
+        <View
+          style={{
+            paddingHorizontal: 16,
+            paddingVertical: 10,
+            backgroundColor: "#fff",
+          }}
+        >
           <Picker
             selectedValue={statusFilter}
             onValueChange={(value) => setStatusFilter(value)}
-            style={{ backgroundColor: '#fff', borderRadius: 8 }}
+            style={{ backgroundColor: "#fff", borderRadius: 8 }}
           >
             <Picker.Item label="All" value="" />
             <Picker.Item label="Pending" value="0" />
@@ -415,21 +576,41 @@ export default function PaymentHistoryScreen({ navigation }) {
         </View>
 
         {/* Content */}
-        {error && !refreshing ? renderError() : (
+        {error && !refreshing ? (
+          renderError()
+        ) : (
           <FlatList
             data={paymentHistory}
             renderItem={renderPaymentItem}
-            keyExtractor={(item, index) => item.id?.toString() || item.transaction_id?.toString() || index.toString()}
+            keyExtractor={(item, index) =>
+              item.id?.toString() ||
+              item.transaction_id?.toString() ||
+              index.toString()
+            }
             ListEmptyComponent={renderEmptyState}
+            ListFooterComponent={() =>
+              loadingMore ? (
+                <View style={styles.loadingMoreContainer}>
+                  <ActivityIndicator size="small" color="#7c3aed" />
+                  <Text style={styles.loadingMoreText}>Loading more...</Text>
+                </View>
+              ) : null
+            }
+            onEndReached={loadMorePayments}
+            onEndReachedThreshold={0.1}
             refreshControl={
-              <RefreshControl 
-                refreshing={refreshing} 
+              <RefreshControl
+                refreshing={refreshing}
                 onRefresh={onRefresh}
-                colors={['#7c3aed']}
+                colors={["#7c3aed"]}
                 tintColor="#7c3aed"
               />
             }
-            contentContainerStyle={styles.listContainer}
+            contentContainerStyle={
+              paymentHistory.length === 0
+                ? styles.emptyListContainer
+                : styles.listContainer
+            }
             showsVerticalScrollIndicator={false}
           />
         )}
@@ -444,19 +625,19 @@ export default function PaymentHistoryScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#f3e8ff',
+    backgroundColor: "#f3e8ff",
   },
   container: {
     flex: 1,
-    backgroundColor: '#f3e8ff',
+    backgroundColor: "#f3e8ff",
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: "#e5e7eb",
     paddingHorizontal: 16,
     paddingVertical: 15,
   },
@@ -465,8 +646,8 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#7c3aed',
+    fontWeight: "600",
+    color: "#7c3aed",
   },
   refreshHeaderButton: {
     padding: 8,
@@ -476,35 +657,35 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: '#6b7280',
+    color: "#6b7280",
   },
   listContainer: {
     paddingTop: 16,
     paddingBottom: 20,
   },
   paymentItem: {
-    backgroundColor: '#ffffff',
+    backgroundColor: "#ffffff",
     borderRadius: 12,
     marginHorizontal: 16,
     marginBottom: 12,
     padding: 16,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
-    position: 'relative',
+    position: "relative",
   },
   paymentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
     marginBottom: 8,
   },
   paymentLeft: {
@@ -512,34 +693,34 @@ const styles = StyleSheet.create({
   },
   paymentId: {
     fontSize: 14,
-    fontWeight: '600',
-    color: '#1f2937',
+    fontWeight: "600",
+    color: "#1f2937",
     marginBottom: 2,
   },
   paymentDate: {
     fontSize: 12,
-    color: '#6b7280',
+    color: "#6b7280",
   },
   paymentAmount: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#7c3aed',
+    fontWeight: "bold",
+    color: "#7c3aed",
   },
   paymentDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 8,
   },
   paymentDescription: {
     flex: 1,
     fontSize: 14,
-    color: '#374151',
+    color: "#374151",
     marginRight: 12,
   },
   statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -552,37 +733,37 @@ const styles = StyleSheet.create({
   },
   statusText: {
     fontSize: 12,
-    fontWeight: '500',
-    textTransform: 'capitalize',
+    fontWeight: "500",
+    textTransform: "capitalize",
   },
   paymentMethod: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 4,
   },
   methodText: {
     fontSize: 12,
-    color: '#6b7280',
+    color: "#6b7280",
     marginLeft: 6,
   },
   clickIndicator: {
-    position: 'absolute',
+    position: "absolute",
     right: 16,
-    top: '50%',
+    top: "50%",
     transform: [{ translateY: -8 }],
   },
   // Modal Styles
   modalContainer: {
     flex: 1,
-    backgroundColor: '#f3e8ff',
+    backgroundColor: "#f3e8ff",
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: "#e5e7eb",
     paddingHorizontal: 16,
     paddingVertical: 15,
   },
@@ -591,82 +772,96 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#7c3aed',
+    fontWeight: "600",
+    color: "#7c3aed",
   },
   modalContent: {
     flex: 1,
-    backgroundColor: '#f8fafc',
+    backgroundColor: "#f8fafc",
   },
   webView: {
     flex: 1,
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   modalLoadingContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
   },
   noDetailsContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 32,
   },
   noDetailsText: {
     fontSize: 16,
-    color: '#6b7280',
+    color: "#6b7280",
     marginTop: 16,
-    textAlign: 'center',
+    textAlign: "center",
   },
   emptyState: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 32,
   },
   emptyTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#374151',
+    fontWeight: "600",
+    color: "#374151",
     marginTop: 16,
     marginBottom: 8,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
+    color: "#6b7280",
+    textAlign: "center",
     lineHeight: 20,
   },
   errorState: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     paddingHorizontal: 32,
   },
   errorTitle: {
     fontSize: 18,
-    fontWeight: '600',
-    color: '#dc2626',
+    fontWeight: "600",
+    color: "#dc2626",
     marginTop: 16,
     marginBottom: 8,
   },
   errorSubtitle: {
     fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
+    color: "#6b7280",
+    textAlign: "center",
     lineHeight: 20,
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: '#7c3aed',
+    backgroundColor: "#7c3aed",
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
   },
   retryButtonText: {
-    color: '#ffffff',
+    color: "#ffffff",
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: "600",
+  },
+  loadingMoreContainer: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 20,
+  },
+  loadingMoreText: {
+    marginLeft: 10,
+    fontSize: 14,
+    color: "#6b7280",
+  },
+  emptyListContainer: {
+    flex: 1,
   },
 });

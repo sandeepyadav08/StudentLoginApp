@@ -74,13 +74,16 @@ export const getCategoriesAPI = async (token) => {
 // Get Grievance Categories API
 export const getGrievanceCategoriesAPI = async (token) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/get-category?page=grievance`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
+    const response = await fetch(
+      `${API_BASE_URL}/get-category?page=grievance`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
     const data = await response.json();
 
@@ -141,7 +144,6 @@ export const getHelpdeskCategoriesAPI = async (token) => {
 
 // Save Grievance/Query API
 export const saveGrievanceAPI = async (grievanceData, token) => {
-
   try {
     let formData = new FormData();
 
@@ -171,8 +173,6 @@ export const saveGrievanceAPI = async (grievanceData, token) => {
       source: "mobile_app",
     };
 
-
-
     // Add all data to FormData
     Object.keys(serverData).forEach((key) => {
       if (
@@ -184,7 +184,7 @@ export const saveGrievanceAPI = async (grievanceData, token) => {
       }
     });
 
-  console.log('hbhbhjbhj',formData)
+    console.log("hbhbhjbhj", formData);
 
     const response = await fetch(`${API_BASE_URL}/save-query`, {
       method: "POST",
@@ -246,15 +246,14 @@ export const saveGrievanceAPI = async (grievanceData, token) => {
 export const saveHelpdeskAPI = async (ticketData, token) => {
   try {
     let formData = new FormData();
-console.log(ticketData)
-const formatDate = (date) => {
-  const d = new Date(date);
-  const year = d.getFullYear();
-  const month = (d.getMonth() + 1).toString().padStart(2, '0');
-  const day = d.getDate().toString().padStart(2, '0');
-  return `${year}-${month}-${day}`;
-};
-
+    console.log(ticketData);
+    const formatDate = (date) => {
+      const d = new Date(date);
+      const year = d.getFullYear();
+      const month = (d.getMonth() + 1).toString().padStart(2, "0");
+      const day = d.getDate().toString().padStart(2, "0");
+      return `${year}-${month}-${day}`;
+    };
 
     // Map the data to match server expectations for helpdesk
     const serverData = {
@@ -608,13 +607,13 @@ export const validateTokenAPI = async (token) => {
   });
 };
 
-// Payment History API
-export const getPaymentHistoryAPI = async (token, paymentStatus = "") => {
+// Payment History API - fetch all records in batches
+export const getPaymentHistoryAPI = async (token, paymentStatus = "", start = 0, length = 20) => {
   const formData = new FormData();
   formData.append("payment_status", paymentStatus);
   formData.append("payment_type", 7);
-  formData.append("start", 0);
-  formData.append("length", 10);
+  formData.append("start", start);
+  formData.append("length", length);
 
   try {
     const response = await fetch(`${API_BASE_URL}/payment-history`, {
@@ -653,7 +652,7 @@ export const getPaymentHistoryAPI = async (token, paymentStatus = "") => {
         status,
       ] = row;
       return {
-        id: index + 1,
+        id: start + index + 1,
         parent_id: id,
         bank_name: bankName,
         amount: Number(amount),
@@ -666,7 +665,54 @@ export const getPaymentHistoryAPI = async (token, paymentStatus = "") => {
       };
     });
 
-    return { success: true, data: history, message: data.message };
+    return { 
+      success: true, 
+      data: history, 
+      message: data.message,
+      totalRecords: data.res?.recordsTotal || history.length,
+      filteredRecords: data.res?.recordsFiltered || history.length,
+      hasMore: history.length === length // If we got full batch, there might be more
+    };
+  } catch (error) {
+    throw {
+      success: false,
+      message: error.message || "Network error occurred",
+    };
+  }
+};
+
+
+// Get Dashboard Data API (includes utility list and term buttons)
+export const getDashboardDataAPI = async (token) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/dashboard`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({}),
+    });
+
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error(
+        "Server did not return valid JSON: " + text.slice(0, 100)
+      );
+    }
+
+    if (!response.ok || data.status !== 200) {
+      throw new Error(data.message || "Failed to fetch dashboard data");
+    }
+
+    return {
+      success: true,
+      data: data.res,
+      message: data.message,
+    };
   } catch (error) {
     throw {
       success: false,
@@ -676,7 +722,15 @@ export const getPaymentHistoryAPI = async (token, paymentStatus = "") => {
 };
 
 // Get Utility Amount API
-export const getUtilityAmountAPI = async (token, subUtility, months = 1, startDate = null, endDate = null, membershipType = null, utilityId = null) => {
+export const getUtilityAmountAPI = async (
+  token,
+  subUtility,
+  months = 1,
+  startDate = null,
+  endDate = null,
+  membershipType = null,
+  utilityId = null
+) => {
   const formData = new FormData();
   formData.append("sub_utility", subUtility);
   formData.append("months", months);
@@ -991,6 +1045,175 @@ export const deleteFileAPI = async (filename, token) => {
   }
 };
 
+// Save Utility Request API
+export const saveUtilityRequestAPI = async (utilityData, token) => {
+  try {
+    if (!token) {
+      throw new Error("Authentication token is required");
+    }
+
+    // Format data according to backend API specification
+    const requestData = {};
+
+    // Helper function to convert payment type to sub_utility name
+    const getSubUtilityName = (paymentType, utilityType) => {
+      const normalizedType = paymentType.toLowerCase().replace(/_/g, " ");
+
+      if (utilityType === "swimming_pool") {
+        if (
+          normalizedType.includes("annual") ||
+          normalizedType.includes("yearly")
+        ) {
+          return "Annual fee";
+        } else if (normalizedType.includes("monthly")) {
+          return "Monthly fee";
+        } else if (normalizedType.includes("daily")) {
+          return "Daily fee";
+        }
+      } else if (utilityType === "gym") {
+        if (
+          normalizedType.includes("annual") ||
+          normalizedType.includes("yearly")
+        ) {
+          return "Annual Fee ";
+        } else if (normalizedType.includes("monthly")) {
+          return "Monthly Fee";
+        } else if (normalizedType.includes("daily")) {
+          return "Daily";
+        }
+      }
+
+      // Fallback: try to match the original text format
+      if (
+        normalizedType.includes("annual") ||
+        normalizedType.includes("yearly")
+      ) {
+        return utilityType === "swimming_pool" ? "Annual fee" : "Annual Fee ";
+      } else if (normalizedType.includes("monthly")) {
+        return utilityType === "swimming_pool" ? "Monthly fee" : "Monthly Fee";
+      } else {
+        return utilityType === "swimming_pool" ? "Daily fee" : "Daily";
+      }
+    };
+
+    // Add utility services data based on selected services
+    if (utilityData.swimming_pool) {
+      requestData["1"] = {
+        id: 1, // Swimming Pool service ID
+        sub_utility: getSubUtilityName(
+          utilityData.swimming_pool.payment_type,
+          "swimming_pool"
+        ),
+        start_date: utilityData.swimming_pool.start_date.replace(/\//g, "-"), // Convert DD/MM/YYYY to DD-MM-YYYY
+        end_date: utilityData.swimming_pool.end_date.replace(/\//g, "-"), // Convert DD/MM/YYYY to DD-MM-YYYY
+      };
+
+      // Add months for monthly payments (default to 1 if not specified)
+      if (
+        utilityData.swimming_pool.payment_type.toLowerCase().includes("monthly")
+      ) {
+        const months = utilityData.swimming_pool.months || 1;
+        requestData["1"].months = months.toString();
+      }
+    }
+
+    if (utilityData.gym) {
+      requestData["2"] = {
+        id: 2, // Gym service ID
+        sub_utility: getSubUtilityName(utilityData.gym.payment_type, "gym"),
+        start_date: utilityData.gym.start_date.replace(/\//g, "-"), // Convert DD/MM/YYYY to DD-MM-YYYY
+        end_date: utilityData.gym.end_date.replace(/\//g, "-"), // Convert DD/MM/YYYY to DD-MM-YYYY
+      };
+
+      // Add months for monthly payments (default to 1 if not specified)
+      if (utilityData.gym.payment_type.toLowerCase().includes("monthly")) {
+        const months = utilityData.gym.months || 1;
+        requestData["2"].months = months.toString();
+      }
+    }
+
+    // Add payment information
+    const totalAmount =
+      typeof utilityData.total_amount === "string"
+        ? parseInt(utilityData.total_amount.replace("₹", ""))
+        : parseInt(utilityData.total_amount);
+
+    requestData.total_amount = totalAmount;
+    requestData.payment_mode = utilityData.payment_option === "kotak" ? 1 : 2; // 1 for Kotak, 2 for ICICI
+    requestData.gateway =
+      utilityData.payment_option === "kotak" ? "KOTAK" : "ICICI";
+
+    console.log("Original utility data received:", utilityData);
+    console.log("Formatted request data for backend:", requestData);
+
+    const response = await fetch(`${API_BASE_URL}/save-utility-request`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(requestData),
+    });
+
+    const responseText = await response.text();
+    let data;
+
+    // Check if response is HTML (payment gateway redirect)
+    if (
+      responseText.includes("<form") &&
+      responseText.includes("ccavenue.com")
+    ) {
+      console.log("Received payment gateway redirect form");
+      return {
+        success: true,
+        message:
+          "Utility request submitted successfully. Redirecting to payment gateway.",
+        data: {
+          payment_form: responseText,
+          is_payment_redirect: true,
+        },
+      };
+    }
+
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse response:", responseText);
+      if (response.ok) {
+        return {
+          success: true,
+          message: responseText || "Utility request submitted successfully",
+          data: { raw_response: responseText },
+        };
+      }
+      throw new Error("Invalid server response: " + responseText.slice(0, 100));
+    }
+
+    console.log("Save Utility Request Response:", {
+      status: response.status,
+      ok: response.ok,
+      data: data,
+    });
+
+    if (response.ok && (response.status === 200 || response.status === 201)) {
+      return {
+        success: true,
+        message: data.message || "Utility request submitted successfully",
+        data: data,
+        requestId: data.request_id || data.id || null,
+        paymentData: data.payment_data || null,
+      };
+    }
+
+    const errorMessage =
+      data.message || data.error || "Failed to submit utility request";
+    throw new Error(errorMessage);
+  } catch (error) {
+    console.error("Save Utility Request Error:", error);
+    throw new Error(error.message || "Failed to submit utility request");
+  }
+};
+
 // Save Ticket API
 export const saveTicketAPI = async (ticketData, token) => {
   try {
@@ -1138,9 +1361,9 @@ export const getGrievancesAPI = async (token, page = 0, limit = 10) => {
     if (!response.ok || (data.status !== 200 && data.status !== 201)) {
       throw new Error(data.message || "Failed to fetch grievances");
     }
-    
+
     const rawGrievances = data.data || [];
-    
+
     // Transform the grievance data to a consistent format - using only required fields
     const grievances = rawGrievances.map((grievance, index) => {
       return {
@@ -1221,7 +1444,7 @@ export const getHelpdeskTicketsAPI = async (token, page = 0, limit = 10) => {
 
     // Handle the specific response structure from helpdesk-list API
     const rawTickets = data.data || [];
-    
+
     // Transform the ticket data to a consistent format - using only required fields
     const tickets = rawTickets.map((ticket, index) => {
       return {
@@ -1266,3 +1489,32 @@ export const getHelpdeskTicketsAPI = async (token, page = 0, limit = 10) => {
 //       console.error("Token invalid:", err.message);
 //     }
 // };
+
+export const getutilitylist = async (token) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/dashboard`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok || (data.status !== 200 && data.status !== 201)) {
+      throw new Error(data.message || "Failed to fetch categories");
+    }
+
+    console.log("kjljolkkp", data.res.utility_list);
+
+    return {
+      success: true,
+      utility_list: data.res.utility_list[0],
+      message: data.message || "Categories fetched successfully",
+    };
+  } catch (error) {
+    console.error("Get Categories Error:", error);
+    throw new Error(error.message || "Failed to fetch categories");
+  }
+};

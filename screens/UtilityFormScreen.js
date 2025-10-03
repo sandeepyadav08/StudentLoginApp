@@ -15,9 +15,13 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getUtilityAmountAPI } from "../services/api";
+import {
+  getUtilityAmountAPI,
+  saveUtilityRequestAPI,
+  getDashboardDataAPI,
+} from "../services/api";
 
-const { width } = Dimensions.get('window');
+const { width } = Dimensions.get("window");
 
 // Responsive utility functions
 const getResponsiveSize = (baseSize, screenWidth) => {
@@ -31,96 +35,126 @@ const getResponsivePadding = (basePadding, screenWidth) => {
   return basePadding;
 };
 
-const UtilityFormScreen = ({ navigation }) => {
-  const { width: screenWidth } = Dimensions.get('window') || { width: 375 };
-  
-  // Swimming Pool Membership State
-  const [swimmingPoolPaymentType, setSwimmingPoolPaymentType] = useState("");
-  const [swimmingPoolStartDate, setSwimmingPoolStartDate] = useState(new Date());
-  const [swimmingPoolEndDate, setSwimmingPoolEndDate] = useState(new Date());
-  const [swimmingPoolAmount, setSwimmingPoolAmount] = useState("₹0");
+// Date calculation utility function
+const calculateMembershipDates = (startDate, paymentType, months = 1) => {
+  const start = new Date(startDate);
+  let end = new Date(startDate);
 
-  // GYM Membership State
-  const [gymPaymentType, setGymPaymentType] = useState("");
-  const [gymStartDate, setGymStartDate] = useState(new Date());
-  const [gymEndDate, setGymEndDate] = useState(new Date());
-  const [gymAmount, setGymAmount] = useState("₹0");
-  
+  // Normalize payment type to handle different formats
+  const normalizedPaymentType = paymentType.toLowerCase();
+
+  if (normalizedPaymentType.includes("daily")) {
+    // End at 11:59:59 PM of the same day
+    end.setHours(23, 59, 59, 999);
+  } else if (normalizedPaymentType.includes("monthly")) {
+    // Move ahead by `months`
+    end.setMonth(end.getMonth() + months);
+    // Set to last day of that month
+    end.setDate(0);
+    end.setHours(23, 59, 59, 999);
+  } else if (
+    normalizedPaymentType.includes("annual") ||
+    normalizedPaymentType.includes("yearly")
+  ) {
+    // Academic year logic: 12 full months, ending on last day of previous month
+    const tmp = new Date(start);
+    tmp.setMonth(tmp.getMonth() + 12);
+    tmp.setDate(0);
+    tmp.setHours(23, 59, 59, 999);
+    end = tmp;
+  } else {
+    // Default to daily
+    end.setHours(23, 59, 59, 999);
+  }
+
+  return { startDate: start, endDate: end };
+};
+
+const UtilityFormScreen = ({ navigation }) => {
+  const { width: screenWidth } = Dimensions.get("window") || { width: 375 };
 
   // Payment Option State
   const [selectedPaymentOption, setSelectedPaymentOption] = useState("");
-
-  // Service Selection State
-  const [isSwimmingPoolSelected, setIsSwimmingPoolSelected] = useState(false);
-  const [isGymSelected, setIsGymSelected] = useState(false);
-  
-  // Month Selection State (for monthly payments)
-  const [swimmingPoolMonths, setSwimmingPoolMonths] = useState(1);
-  const [gymMonths, setGymMonths] = useState(1);
 
   // UI State
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState({});
   const [isFormSubmitted, setIsFormSubmitted] = useState(false);
   const [isPaymentProcessing, setIsPaymentProcessing] = useState(false);
-  
-  // API Loading States
-  const [isSwimmingPoolAmountLoading, setIsSwimmingPoolAmountLoading] = useState(false);
-  const [isGymAmountLoading, setIsGymAmountLoading] = useState(false);
-  
-  // Date Picker State
-  const [showSwimmingPoolStartDatePicker, setShowSwimmingPoolStartDatePicker] = useState(false);
-  const [showSwimmingPoolEndDatePicker, setShowSwimmingPoolEndDatePicker] = useState(false);
-  const [showGymStartDatePicker, setShowGymStartDatePicker] = useState(false);
-  const [showGymEndDatePicker, setShowGymEndDatePicker] = useState(false);
-  
-  // Payment Type Picker State
-  const [showSwimmingPoolPaymentPicker, setShowSwimmingPoolPaymentPicker] = useState(false);
-  const [showGymPaymentPicker, setShowGymPaymentPicker] = useState(false);
-  
-  // Month Picker State
-  const [showSwimmingPoolMonthPicker, setShowSwimmingPoolMonthPicker] = useState(false);
-  const [showGymMonthPicker, setShowGymMonthPicker] = useState(false);
 
-  // Payment Type Options (amounts will be fetched from API)
-  const swimmingPoolPaymentOptions = [
-    { id: 1, value: "daily", text: "Daily fee", apiValue: "Daily fee" },
-    { id: 2, value: "monthly", text: "Monthly fee", apiValue: "Monthly fee" },
-    { id: 3, value: "yearly", text: "Annual Fee", apiValue: "Annual fee" },
-  ];
+  // Date Picker State (for dynamic utilities)
+  const [showDatePicker, setShowDatePicker] = useState({
+    utilityId: null,
+    type: null,
+  });
+  const [showPaymentPicker, setShowPaymentPicker] = useState({
+    utilityId: null,
+    show: false,
+  });
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [showMonthPicker, setShowMonthPicker] = useState({
+    utilityId: null,
+    show: false,
+  });
 
-  const gymPaymentOptions = [
-    { id: 1, value: "daily", text: "Daily fee", apiValue: "Daily" },
-    { id: 2, value: "monthly", text: "Monthly fee", apiValue: "Monthly Fee" },
-    { id: 3, value: "yearly", text: "Annual Fee", apiValue: "Annual Fee " },
-  ];
-
-  // Utility Service IDs (these should match your backend database IDs)
-  const SWIMMING_POOL_ID = 1; // Replace with actual Swimming Pool service ID from your database
-  const GYM_ID = 2; // Replace with actual Gym service ID from your database
+  // Dynamic utility selection state
+  const [selectedUtilities, setSelectedUtilities] = useState({});
+  const [utilityAmounts, setUtilityAmounts] = useState({});
+  const [utilityPaymentTypes, setUtilityPaymentTypes] = useState({});
+  const [utilityStartDates, setUtilityStartDates] = useState({});
+  const [utilityEndDates, setUtilityEndDates] = useState({});
+  const [utilityMonths, setUtilityMonths] = useState({});
+  const [utilityAmountLoading, setUtilityAmountLoading] = useState({});
 
   const paymentProviders = [
     { id: 1, value: "kotak", text: "Kotak Bank", icon: "card-outline" },
     { id: 2, value: "icici", text: "ICICI Bank", icon: "card-outline" },
   ];
-  
-  // Month options (1-11 months)
+
+  // Helper functions for dynamic utilities
+  const getUtilityById = (id) => utilities.find((utility) => utility.id === id);
+
+  const getUtilityPaymentOptions = (utilityId) =>
+    utilityPaymentOptions[utilityId] || [];
+
+  const isUtilitySelected = (utilityId) =>
+    selectedUtilities[utilityId] || false;
+
+  const getUtilityAmount = (utilityId) => utilityAmounts[utilityId] || "₹0";
+
+  const getUtilityPaymentType = (utilityId) =>
+    utilityPaymentTypes[utilityId] || "";
+
+  const getUtilityStartDate = (utilityId) =>
+    utilityStartDates[utilityId] || new Date();
+
+  const getUtilityEndDate = (utilityId) =>
+    utilityEndDates[utilityId] || new Date();
+
+  const getUtilityMonths = (utilityId) => utilityMonths[utilityId] || 1;
+
+  // Month options (1-12 months)
   const monthOptions = Array.from({ length: 11 }, (_, i) => ({
     id: i + 1,
     value: i + 1,
-    text: `${i + 1} Month${i + 1 > 1 ? 's' : ''}`
+    text: `${i + 1}`,
   }));
 
   // API Integration Functions
   const formatDateForAPI = (date) => {
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
     return `${day}-${month}-${year}`;
   };
 
-
-  const fetchUtilityAmount = async (subUtility, months = 1, startDate = null, endDate = null, utilityId = null) => {
+  const fetchUtilityAmount = async (
+    utilityId,
+    subUtility,
+    months = 1,
+    startDate = null,
+    endDate = null
+  ) => {
     try {
       const token = await AsyncStorage.getItem("userToken");
       if (!token) {
@@ -152,56 +186,45 @@ const UtilityFormScreen = ({ navigation }) => {
     }
   };
 
-  const updateSwimmingPoolAmount = async (paymentType, months = 1) => {
+  const updateUtilityAmount = async (utilityId, paymentType, months = 1) => {
     try {
-      setIsSwimmingPoolAmountLoading(true);
-      const option = swimmingPoolPaymentOptions.find(opt => opt.value === paymentType);
+      setUtilityAmountLoading((prev) => ({ ...prev, [utilityId]: true }));
+
+      const options = getUtilityPaymentOptions(utilityId);
+      const option = options.find((opt) => opt.value === paymentType);
       if (!option) return;
 
-      const amount = await fetchUtilityAmount(
-        option.apiValue, 
-        months, 
-        swimmingPoolStartDate, 
-        swimmingPoolEndDate,
-        SWIMMING_POOL_ID
-      );
-      setSwimmingPoolAmount(`₹${amount}`);
-    } catch (error) {
-      console.error("Swimming pool amount update error:", error);
-      setSwimmingPoolAmount("₹0");
-      Alert.alert("Error", "Failed to fetch swimming pool amount. Please try again.");
-    } finally {
-      setIsSwimmingPoolAmountLoading(false);
-    }
-  };
-
-  const updateGymAmount = async (paymentType, months = 1) => {
-    try {
-      setIsGymAmountLoading(true);
-      const option = gymPaymentOptions.find(opt => opt.value === paymentType);
-      if (!option) return;
+      const startDate = getUtilityStartDate(utilityId);
+      const endDate = getUtilityEndDate(utilityId);
 
       const amount = await fetchUtilityAmount(
-        option.apiValue, 
-        months, 
-        gymStartDate, 
-        gymEndDate,
-        GYM_ID
+        utilityId,
+        option.apiValue,
+        months,
+        startDate,
+        endDate
       );
-      setGymAmount(`₹${amount}`);
+
+      setUtilityAmounts((prev) => ({ ...prev, [utilityId]: `₹${amount}` }));
     } catch (error) {
-      console.error("Gym amount update error:", error);
-      setGymAmount("₹0");
-      Alert.alert("Error", "Failed to fetch gym amount. Please try again.");
+      console.error(`Utility ${utilityId} amount update error:`, error);
+      setUtilityAmounts((prev) => ({ ...prev, [utilityId]: "₹0" }));
+
+      const utility = getUtilityById(utilityId);
+      const utilityName = utility ? utility.name : "utility";
+      Alert.alert(
+        "Error",
+        `Failed to fetch ${utilityName} amount. Please try again.`
+      );
     } finally {
-      setIsGymAmountLoading(false);
+      setUtilityAmountLoading((prev) => ({ ...prev, [utilityId]: false }));
     }
   };
 
   // Helper Functions
   const formatDate = (date) => {
-    const day = String(date.getDate()).padStart(2, '0');
-    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
   };
@@ -234,20 +257,20 @@ const UtilityFormScreen = ({ navigation }) => {
 
   const calculateEndDate = (startDate, paymentType, months = 1) => {
     const newEndDate = new Date(startDate);
-    
+
     switch (paymentType) {
-      case 'daily':
+      case "daily":
         // For daily: End at 11:59:59 PM of the same day
         newEndDate.setHours(23, 59, 59, 999);
         break;
-      case 'monthly':
+      case "monthly":
         // For monthly: End at last day of the target month
         newEndDate.setMonth(newEndDate.getMonth() + months);
         // Set to last day of the month
         newEndDate.setDate(0); // This sets to last day of previous month (which is our target month)
         newEndDate.setHours(23, 59, 59, 999);
         break;
-      case 'yearly':
+      case "yearly":
         // For yearly: Use academic year logic (September 26th to August 31st)
         const academicDates = calculateAnnualMembershipDates(startDate);
         return academicDates.endDate;
@@ -255,195 +278,218 @@ const UtilityFormScreen = ({ navigation }) => {
         // Default to daily
         newEndDate.setHours(23, 59, 59, 999);
     }
-    
+
     return newEndDate;
   };
 
   const calculateTotalAmount = () => {
     let total = 0;
-    
-    if (isSwimmingPoolSelected && swimmingPoolAmount) {
-      const amount = parseInt(swimmingPoolAmount.replace('₹', '') || '0');
-      total += amount;
-    }
-    
-    if (isGymSelected && gymAmount) {
-      const amount = parseInt(gymAmount.replace('₹', '') || '0');
-      total += amount;
-    }
-    
+
+    Object.keys(selectedUtilities).forEach((utilityId) => {
+      if (selectedUtilities[utilityId] && utilityAmounts[utilityId]) {
+        const amount = parseInt(
+          utilityAmounts[utilityId].replace("₹", "") || "0"
+        );
+        total += amount;
+      }
+    });
+
     return `₹${total}`;
   };
 
-  // Event Handlers
-  const handleSwimmingPoolSelection = (selected) => {
-    setIsSwimmingPoolSelected(selected);
+  // Event Handlers for Dynamic Utilities
+  const handleUtilitySelection = (utilityId, selected) => {
+    setSelectedUtilities((prev) => ({ ...prev, [utilityId]: selected }));
+
     if (!selected) {
-      // Reset swimming pool related states
-      setSwimmingPoolPaymentType("");
-      setSwimmingPoolAmount("₹0");
-      setSwimmingPoolStartDate(new Date());
-      setSwimmingPoolEndDate(new Date());
-      setSwimmingPoolMonths(1);
+      // Reset utility related states
+      setUtilityPaymentTypes((prev) => ({ ...prev, [utilityId]: "" }));
+      setUtilityAmounts((prev) => ({ ...prev, [utilityId]: "₹0" }));
+      setUtilityStartDates((prev) => ({ ...prev, [utilityId]: new Date() }));
+      setUtilityEndDates((prev) => ({ ...prev, [utilityId]: new Date() }));
+      setUtilityMonths((prev) => ({ ...prev, [utilityId]: 1 }));
+    } else {
+      // Initialize with default values
+      const today = new Date();
+      setUtilityStartDates((prev) => ({ ...prev, [utilityId]: today }));
+      setUtilityEndDates((prev) => ({ ...prev, [utilityId]: today }));
+      setUtilityMonths((prev) => ({ ...prev, [utilityId]: 1 }));
     }
+
     setErrors({ ...errors, general: "" });
   };
 
-  const handleGymSelection = (selected) => {
-    setIsGymSelected(selected);
-    if (!selected) {
-      // Reset gym related states
-      setGymPaymentType("");
-      setGymAmount("₹0");
-      setGymStartDate(new Date());
-      setGymEndDate(new Date());
-      setGymMonths(1);
-    }
-    setErrors({ ...errors, general: "" });
-  };
+  // Handle start date change and recalculate end date
+  const handleUtilityStartDateChange = (utilityId, newStartDate) => {
+    setUtilityStartDates((prev) => ({ ...prev, [utilityId]: newStartDate }));
 
-  const handleSwimmingPoolPaymentSelect = async (option) => {
-    // Immediately update UI for better UX
-    setSwimmingPoolPaymentType(option.value);
-    setShowSwimmingPoolPaymentPicker(false);
-    setErrors({ ...errors, swimmingPoolPaymentType: "" });
-    
-    // Reset months to 1 when changing payment type
-    if (option.value !== 'monthly') {
-      setSwimmingPoolMonths(1);
-    }
-    
-    let updatedStartDate = swimmingPoolStartDate;
-    let newEndDate;
-    
-    if (option.value === 'yearly') {
-      // For annual payments, calculate end date based on current start date
-      const annualDates = calculateAnnualMembershipDates(swimmingPoolStartDate);
-      newEndDate = annualDates.endDate;
-      // Keep the current start date, don't change it
-    } else {
-      // Calculate correct end date for daily/monthly
-      const months = option.value === 'monthly' ? swimmingPoolMonths : 1;
-      newEndDate = calculateEndDate(swimmingPoolStartDate, option.value, months);
-    }
-    
-    setSwimmingPoolEndDate(newEndDate);
-    
-    // Fetch amount from API
-    try {
-      setIsSwimmingPoolAmountLoading(true);
-      const months = option.value === 'monthly' ? swimmingPoolMonths : 1;
-      const amount = await fetchUtilityAmount(
-        option.apiValue, 
-        months, 
-        updatedStartDate, 
-        newEndDate,
-        SWIMMING_POOL_ID
+    const paymentType = getUtilityPaymentType(utilityId);
+    if (paymentType) {
+      const months = getUtilityMonths(utilityId);
+      const { startDate, endDate } = calculateMembershipDates(
+        newStartDate,
+        paymentType,
+        months
       );
-      setSwimmingPoolAmount(`₹${amount}`);
-    } catch (error) {
-      console.error("Swimming pool amount update error:", error);
-      setSwimmingPoolAmount("₹0");
-      Alert.alert("Error", "Failed to fetch swimming pool amount. Please try again.");
-    } finally {
-      setIsSwimmingPoolAmountLoading(false);
+      setUtilityEndDates((prev) => ({ ...prev, [utilityId]: endDate }));
     }
   };
 
-  const handleGymPaymentSelect = async (option) => {
+  // Handle month change for monthly payments
+  const handleUtilityMonthChange = async (utilityId, newMonths) => {
+    setUtilityMonths((prev) => ({ ...prev, [utilityId]: newMonths }));
+
+    const paymentType = getUtilityPaymentType(utilityId);
+    const startDate = getUtilityStartDate(utilityId);
+
+    if (paymentType && paymentType.toLowerCase().includes("monthly")) {
+      const { startDate: calcStart, endDate } = calculateMembershipDates(
+        startDate,
+        paymentType,
+        newMonths
+      );
+      setUtilityEndDates((prev) => ({ ...prev, [utilityId]: endDate }));
+
+      // Recalculate amount with new month count
+      const options = getUtilityPaymentOptions(utilityId);
+      const option = options.find((opt) => opt.value === paymentType);
+      if (option) {
+        try {
+          setUtilityAmountLoading((prev) => ({ ...prev, [utilityId]: true }));
+          const amount = await fetchUtilityAmount(
+            utilityId,
+            option.apiValue,
+            newMonths,
+            startDate,
+            endDate
+          );
+          setUtilityAmounts((prev) => ({ ...prev, [utilityId]: `₹${amount}` }));
+        } catch (error) {
+          console.error(`Utility ${utilityId} amount update error:`, error);
+          setUtilityAmounts((prev) => ({ ...prev, [utilityId]: "₹0" }));
+
+          const utility = getUtilityById(utilityId);
+          const utilityName = utility ? utility.name : "utility";
+          Alert.alert(
+            "Error",
+            `Failed to fetch ${utilityName} amount. Please try again.`
+          );
+        } finally {
+          setUtilityAmountLoading((prev) => ({ ...prev, [utilityId]: false }));
+        }
+      }
+    }
+  };
+
+  const handleUtilityPaymentSelect = async (utilityId, option) => {
     // Immediately update UI for better UX
-    setGymPaymentType(option.value);
-    setShowGymPaymentPicker(false);
-    setErrors({ ...errors, gymPaymentType: "" });
-    
+    setUtilityPaymentTypes((prev) => ({ ...prev, [utilityId]: option.value }));
+    setErrors({ ...errors, [`utility_${utilityId}_paymentType`]: "" });
+
     // Reset months to 1 when changing payment type
-    if (option.value !== 'monthly') {
-      setGymMonths(1);
+    if (!option.value.toLowerCase().includes("monthly")) {
+      setUtilityMonths((prev) => ({ ...prev, [utilityId]: 1 }));
     }
-    
-    let updatedStartDate = gymStartDate;
-    let newEndDate;
-    
-    if (option.value === 'yearly') {
-      // For annual payments, calculate end date based on current start date
-      const annualDates = calculateAnnualMembershipDates(gymStartDate);
-      newEndDate = annualDates.endDate;
-      // Keep the current start date, don't change it
-    } else {
-      // Calculate correct end date for daily/monthly
-      const months = option.value === 'monthly' ? gymMonths : 1;
-      newEndDate = calculateEndDate(gymStartDate, option.value, months);
-    }
-    
-    setGymEndDate(newEndDate);
-    
+
+    const currentStartDate = getUtilityStartDate(utilityId);
+    const currentMonths = getUtilityMonths(utilityId);
+
+    // Use the new date calculation utility
+    const months = option.value.toLowerCase().includes("monthly")
+      ? currentMonths
+      : 1;
+    const { startDate, endDate } = calculateMembershipDates(
+      currentStartDate,
+      option.value,
+      months
+    );
+
+    setUtilityEndDates((prev) => ({ ...prev, [utilityId]: endDate }));
+
     // Fetch amount from API
     try {
-      setIsGymAmountLoading(true);
-      const months = option.value === 'monthly' ? gymMonths : 1;
+      setUtilityAmountLoading((prev) => ({ ...prev, [utilityId]: true }));
+      const months = option.value.toLowerCase().includes("monthly")
+        ? currentMonths
+        : 1;
       const amount = await fetchUtilityAmount(
-        option.apiValue, 
-        months, 
-        updatedStartDate, 
-        newEndDate,
-        GYM_ID
+        utilityId,
+        option.apiValue,
+        months,
+        currentStartDate,
+        endDate
       );
-      setGymAmount(`₹${amount}`);
+      setUtilityAmounts((prev) => ({ ...prev, [utilityId]: `₹${amount}` }));
     } catch (error) {
-      console.error("Gym amount update error:", error);
-      setGymAmount("₹0");
-      Alert.alert("Error", "Failed to fetch gym amount. Please try again.");
+      console.error(`Utility ${utilityId} amount update error:`, error);
+      setUtilityAmounts((prev) => ({ ...prev, [utilityId]: "₹0" }));
+
+      const utility = getUtilityById(utilityId);
+      const utilityName = utility ? utility.name : "utility";
+      Alert.alert(
+        "Error",
+        `Failed to fetch ${utilityName} amount. Please try again.`
+      );
     } finally {
-      setIsGymAmountLoading(false);
+      setUtilityAmountLoading((prev) => ({ ...prev, [utilityId]: false }));
     }
   };
 
   const handleDateChange = (type, event, selectedDate) => {
     if (selectedDate) {
       switch (type) {
-        case 'swimmingPoolStart':
+        case "swimmingPoolStart":
           setShowSwimmingPoolStartDatePicker(false);
           setSwimmingPoolStartDate(selectedDate);
-          
+
           // Auto-update end date if payment type is selected
           if (swimmingPoolPaymentType) {
             let newEndDate;
-            if (swimmingPoolPaymentType === 'yearly') {
+            if (swimmingPoolPaymentType === "yearly") {
               // For annual payments, calculate end date as 1 year minus 1 day
               const annualDates = calculateAnnualMembershipDates(selectedDate);
               newEndDate = annualDates.endDate;
             } else {
               // For daily/monthly payments
-              const months = swimmingPoolPaymentType === 'monthly' ? swimmingPoolMonths : 1;
-              newEndDate = calculateEndDate(selectedDate, swimmingPoolPaymentType, months);
+              const months =
+                swimmingPoolPaymentType === "monthly" ? swimmingPoolMonths : 1;
+              newEndDate = calculateEndDate(
+                selectedDate,
+                swimmingPoolPaymentType,
+                months
+              );
             }
             setSwimmingPoolEndDate(newEndDate);
           }
           break;
-        case 'swimmingPoolEnd':
+        case "swimmingPoolEnd":
           setShowSwimmingPoolEndDatePicker(false);
           setSwimmingPoolEndDate(selectedDate);
           break;
-        case 'gymStart':
+        case "gymStart":
           setShowGymStartDatePicker(false);
           setGymStartDate(selectedDate);
-          
+
           // Auto-update end date if payment type is selected
           if (gymPaymentType) {
             let newEndDate;
-            if (gymPaymentType === 'yearly') {
+            if (gymPaymentType === "yearly") {
               // For annual payments, calculate end date as 1 year minus 1 day
               const annualDates = calculateAnnualMembershipDates(selectedDate);
               newEndDate = annualDates.endDate;
             } else {
               // For daily/monthly payments
-              const months = gymPaymentType === 'monthly' ? gymMonths : 1;
-              newEndDate = calculateEndDate(selectedDate, gymPaymentType, months);
+              const months = gymPaymentType === "monthly" ? gymMonths : 1;
+              newEndDate = calculateEndDate(
+                selectedDate,
+                gymPaymentType,
+                months
+              );
             }
             setGymEndDate(newEndDate);
           }
           break;
-        case 'gymEnd':
+        case "gymEnd":
           setShowGymEndDatePicker(false);
           setGymEndDate(selectedDate);
           break;
@@ -462,21 +508,27 @@ const UtilityFormScreen = ({ navigation }) => {
     // Immediately update UI
     setSwimmingPoolMonths(monthOption.value);
     setShowSwimmingPoolMonthPicker(false);
-    
+
     // Calculate new end date first
-    const newEndDate = calculateEndDate(swimmingPoolStartDate, swimmingPoolPaymentType, monthOption.value);
+    const newEndDate = calculateEndDate(
+      swimmingPoolStartDate,
+      swimmingPoolPaymentType,
+      monthOption.value
+    );
     setSwimmingPoolEndDate(newEndDate);
-    
+
     // Fetch new amount with updated month count from API
     if (swimmingPoolPaymentType) {
-      const option = swimmingPoolPaymentOptions.find(opt => opt.value === swimmingPoolPaymentType);
+      const option = swimmingPoolPaymentOptions.find(
+        (opt) => opt.value === swimmingPoolPaymentType
+      );
       if (option) {
         try {
           setIsSwimmingPoolAmountLoading(true);
           const amount = await fetchUtilityAmount(
-            option.apiValue, 
-            monthOption.value, 
-            swimmingPoolStartDate, 
+            option.apiValue,
+            monthOption.value,
+            swimmingPoolStartDate,
             newEndDate,
             SWIMMING_POOL_ID
           );
@@ -484,7 +536,10 @@ const UtilityFormScreen = ({ navigation }) => {
         } catch (error) {
           console.error("Swimming pool amount update error:", error);
           setSwimmingPoolAmount("₹0");
-          Alert.alert("Error", "Failed to fetch swimming pool amount. Please try again.");
+          Alert.alert(
+            "Error",
+            "Failed to fetch swimming pool amount. Please try again."
+          );
         } finally {
           setIsSwimmingPoolAmountLoading(false);
         }
@@ -496,21 +551,27 @@ const UtilityFormScreen = ({ navigation }) => {
     // Immediately update UI
     setGymMonths(monthOption.value);
     setShowGymMonthPicker(false);
-    
+
     // Calculate new end date first
-    const newEndDate = calculateEndDate(gymStartDate, gymPaymentType, monthOption.value);
+    const newEndDate = calculateEndDate(
+      gymStartDate,
+      gymPaymentType,
+      monthOption.value
+    );
     setGymEndDate(newEndDate);
-    
+
     // Fetch new amount with updated month count from API
     if (gymPaymentType) {
-      const option = gymPaymentOptions.find(opt => opt.value === gymPaymentType);
+      const option = gymPaymentOptions.find(
+        (opt) => opt.value === gymPaymentType
+      );
       if (option) {
         try {
           setIsGymAmountLoading(true);
           const amount = await fetchUtilityAmount(
-            option.apiValue, 
-            monthOption.value, 
-            gymStartDate, 
+            option.apiValue,
+            monthOption.value,
+            gymStartDate,
             newEndDate,
             GYM_ID
           );
@@ -531,32 +592,37 @@ const UtilityFormScreen = ({ navigation }) => {
     const newErrors = {};
 
     // Check if at least one service is selected
-    if (!isSwimmingPoolSelected && !isGymSelected) {
+    const hasSelectedUtility = Object.values(selectedUtilities).some(
+      (selected) => selected
+    );
+    if (!hasSelectedUtility) {
       newErrors.general = "Please select at least one utility service";
     }
 
-    // Validate Swimming Pool if selected
-    if (isSwimmingPoolSelected) {
-      if (!swimmingPoolPaymentType) {
-        newErrors.swimmingPoolPaymentType = "Please select a payment type for Swimming Pool";
-      }
-      if (swimmingPoolEndDate <= swimmingPoolStartDate) {
-        newErrors.swimmingPoolEndDate = "End date must be after start date";
-      }
-    }
+    // Validate each selected utility
+    Object.keys(selectedUtilities).forEach((utilityId) => {
+      if (selectedUtilities[utilityId]) {
+        const utility = getUtilityById(utilityId);
+        const utilityName = utility ? utility.name : `Utility ${utilityId}`;
 
-    // Validate GYM if selected
-    if (isGymSelected) {
-      if (!gymPaymentType) {
-        newErrors.gymPaymentType = "Please select a payment type for GYM";
+        if (!getUtilityPaymentType(utilityId)) {
+          newErrors[
+            `utility_${utilityId}_paymentType`
+          ] = `Please select a payment type for ${utilityName}`;
+        }
+
+        const startDate = getUtilityStartDate(utilityId);
+        const endDate = getUtilityEndDate(utilityId);
+        if (endDate <= startDate) {
+          newErrors[
+            `utility_${utilityId}_endDate`
+          ] = `End date must be after start date for ${utilityName}`;
+        }
       }
-      if (gymEndDate <= gymStartDate) {
-        newErrors.gymEndDate = "End date must be after start date";
-      }
-    }
+    });
 
     // Validate payment option
-    if ((isSwimmingPoolSelected || isGymSelected) && !selectedPaymentOption) {
+    if (hasSelectedUtility && !selectedPaymentOption) {
       newErrors.paymentOption = "Please select a payment method";
     }
 
@@ -574,56 +640,92 @@ const UtilityFormScreen = ({ navigation }) => {
       try {
         token = await AsyncStorage.getItem("userToken");
       } catch (storageError) {
-        console.error('AsyncStorage error:', storageError);
-        Alert.alert("Error", "Unable to access device storage. Please try again.");
-        return;
-      }
-      
-      if (!token) {
-        Alert.alert("Error", "Authentication token not found. Please login again.");
+        console.error("AsyncStorage error:", storageError);
+        Alert.alert(
+          "Error",
+          "Unable to access device storage. Please try again."
+        );
         return;
       }
 
-      const utilityData = {
-        swimming_pool: isSwimmingPoolSelected ? {
-          payment_type: swimmingPoolPaymentType,
-          start_date: formatDate(swimmingPoolStartDate),
-          end_date: formatDate(swimmingPoolEndDate),
-          amount: swimmingPoolAmount,
-        } : null,
-        gym: isGymSelected ? {
-          payment_type: gymPaymentType,
-          start_date: formatDate(gymStartDate),
-          end_date: formatDate(gymEndDate),
-          amount: gymAmount,
-        } : null,
+      if (!token) {
+        Alert.alert(
+          "Error",
+          "Authentication token not found. Please login again."
+        );
+        return;
+      }
+
+      const utilityData = {};
+
+      // Format data according to backend API specification
+      Object.keys(selectedUtilities).forEach((utilityId) => {
+        if (selectedUtilities[utilityId]) {
+          const utility = getUtilityById(utilityId);
+          if (utility) {
+            const paymentType = getUtilityPaymentType(utilityId);
+
+            // Map utility names to expected backend format
+            if (utility.name === "Swimming Pool Membership") {
+              utilityData.swimming_pool = {
+                payment_type: paymentType,
+                start_date: formatDate(getUtilityStartDate(utilityId)),
+                end_date: formatDate(getUtilityEndDate(utilityId)),
+                amount: getUtilityAmount(utilityId),
+                months:
+                  paymentType === "monthly"
+                    ? getUtilityMonths(utilityId)
+                    : undefined,
+              };
+            } else if (utility.name === "GYM Membership") {
+              utilityData.gym = {
+                payment_type: paymentType,
+                start_date: formatDate(getUtilityStartDate(utilityId)),
+                end_date: formatDate(getUtilityEndDate(utilityId)),
+                amount: getUtilityAmount(utilityId),
+                months:
+                  paymentType === "monthly"
+                    ? getUtilityMonths(utilityId)
+                    : undefined,
+              };
+            }
+          }
+        }
+      });
+
+      const requestData = {
+        ...utilityData,
         payment_option: selectedPaymentOption,
         total_amount: calculateTotalAmount(),
         timestamp: new Date().toISOString(),
       };
 
-      console.log('Utility Form Data:', utilityData);
-      
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log("Utility Form Data:", requestData);
 
-      Alert.alert(
-        "Success",
-        "Your utility form has been submitted successfully! You can now proceed to payment.",
-        [
-          {
-            text: "OK",
-            onPress: () => {
-              setIsFormSubmitted(true);
+      // Call the actual API
+      const response = await saveUtilityRequestAPI(requestData, token);
+
+      if (response.success) {
+        Alert.alert(
+          "Success",
+          "Your utility form has been submitted successfully! You can now proceed to payment.",
+          [
+            {
+              text: "OK",
+              onPress: () => {
+                setIsFormSubmitted(true);
+              },
             },
-          },
-        ]
-      );
+          ]
+        );
+      } else {
+        throw new Error(response.message || "Failed to submit utility form");
+      }
     } catch (error) {
-      console.error('Utility form submission error:', error);
+      console.error("Utility form submission error:", error);
       Alert.alert(
         "Submission Failed",
-        "Failed to submit utility form. Please try again.",
+        error.message || "Failed to submit utility form. Please try again.",
         [{ text: "OK" }]
       );
     } finally {
@@ -639,49 +741,59 @@ const UtilityFormScreen = ({ navigation }) => {
       try {
         token = await AsyncStorage.getItem("userToken");
       } catch (storageError) {
-        console.error('AsyncStorage error:', storageError);
-        Alert.alert("Error", "Unable to access device storage. Please try again.");
+        console.error("AsyncStorage error:", storageError);
+        Alert.alert(
+          "Error",
+          "Unable to access device storage. Please try again."
+        );
         return;
       }
-      
+
       if (!token) {
-        Alert.alert("Error", "Authentication token not found. Please login again.");
+        Alert.alert(
+          "Error",
+          "Authentication token not found. Please login again."
+        );
         return;
       }
+
+      const serviceDetails = {};
+
+      // Build service details for each selected utility
+      Object.keys(selectedUtilities).forEach((utilityId) => {
+        if (selectedUtilities[utilityId]) {
+          const utility = getUtilityById(utilityId);
+          if (utility) {
+            serviceDetails[utility.name.toLowerCase().replace(/\s+/g, "_")] = {
+              payment_type: getUtilityPaymentType(utilityId),
+              amount: getUtilityAmount(utilityId),
+              duration: `${formatDate(
+                getUtilityStartDate(utilityId)
+              )} to ${formatDate(getUtilityEndDate(utilityId))}`,
+            };
+          }
+        }
+      });
 
       const paymentData = {
         total_amount: calculateTotalAmount(),
         payment_option: selectedPaymentOption,
-        service_details: {
-          swimming_pool: isSwimmingPoolSelected ? {
-            payment_type: swimmingPoolPaymentType,
-            amount: swimmingPoolAmount,
-            duration: `${formatDate(swimmingPoolStartDate)} to ${formatDate(swimmingPoolEndDate)}`,
-          } : null,
-          gym: isGymSelected ? {
-            payment_type: gymPaymentType,
-            amount: gymAmount,
-            duration: `${formatDate(gymStartDate)} to ${formatDate(gymEndDate)}`,
-          } : null,
-        },
+        service_details: serviceDetails,
         transaction_id: `UTL_${Date.now()}`,
         timestamp: new Date().toISOString(),
       };
 
-      console.log('Processing payment:', paymentData);
-      
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log("Processing payment:", paymentData);
 
-      // Redirect to payment screen (placeholder navigation)
-      if (navigation && typeof navigation.navigate === 'function') {
-        navigation.navigate('PaymentHistory');
+      // Navigate to payment gateway screen
+      if (navigation && typeof navigation.navigate === "function") {
+        navigation.navigate("PaymentGateway", {
+          paymentData: paymentData,
+        });
       }
-
-      // After redirect (or on success), reset the form
       resetForm();
     } catch (error) {
-      console.error('Payment processing error:', error);
+      console.error("Payment processing error:", error);
       Alert.alert(
         "Payment Failed",
         "Failed to process payment. Please try again.",
@@ -704,48 +816,82 @@ const UtilityFormScreen = ({ navigation }) => {
       try {
         token = await AsyncStorage.getItem("userToken");
       } catch (storageError) {
-        console.error('AsyncStorage error:', storageError);
-        Alert.alert("Error", "Unable to access device storage. Please try again.");
-        return;
-      }
-      
-      if (!token) {
-        Alert.alert("Error", "Authentication token not found. Please login again.");
+        console.error("AsyncStorage error:", storageError);
+        Alert.alert(
+          "Error",
+          "Unable to access device storage. Please try again."
+        );
         return;
       }
 
-      const utilityData = {
-        swimming_pool: isSwimmingPoolSelected ? {
-          payment_type: swimmingPoolPaymentType,
-          start_date: formatDate(swimmingPoolStartDate),
-          end_date: formatDate(swimmingPoolEndDate),
-          amount: swimmingPoolAmount,
-          months: swimmingPoolPaymentType === 'monthly' ? swimmingPoolMonths : undefined,
-        } : null,
-        gym: isGymSelected ? {
-          payment_type: gymPaymentType,
-          start_date: formatDate(gymStartDate),
-          end_date: formatDate(gymEndDate),
-          amount: gymAmount,
-          months: gymPaymentType === 'monthly' ? gymMonths : undefined,
-        } : null,
+      if (!token) {
+        Alert.alert(
+          "Error",
+          "Authentication token not found. Please login again."
+        );
+        return;
+      }
+
+      const utilityData = {};
+
+      // Format data according to backend API specification
+      Object.keys(selectedUtilities).forEach((utilityId) => {
+        if (selectedUtilities[utilityId]) {
+          const utility = getUtilityById(utilityId);
+          if (utility) {
+            const paymentType = getUtilityPaymentType(utilityId);
+
+            // Map utility names to expected backend format
+            if (utility.name === "Swimming Pool Membership") {
+              utilityData.swimming_pool = {
+                payment_type: paymentType,
+                start_date: formatDate(getUtilityStartDate(utilityId)),
+                end_date: formatDate(getUtilityEndDate(utilityId)),
+                amount: getUtilityAmount(utilityId),
+                months:
+                  paymentType === "monthly"
+                    ? getUtilityMonths(utilityId)
+                    : undefined,
+              };
+            } else if (utility.name === "GYM Membership") {
+              utilityData.gym = {
+                payment_type: paymentType,
+                start_date: formatDate(getUtilityStartDate(utilityId)),
+                end_date: formatDate(getUtilityEndDate(utilityId)),
+                amount: getUtilityAmount(utilityId),
+                months:
+                  paymentType === "monthly"
+                    ? getUtilityMonths(utilityId)
+                    : undefined,
+              };
+            }
+          }
+        }
+      });
+
+      const requestData = {
+        ...utilityData,
         payment_option: selectedPaymentOption,
         total_amount: calculateTotalAmount(),
         timestamp: new Date().toISOString(),
       };
 
-      console.log('Submitting application (silent):', utilityData);
+      console.log("Submitting application (silent):", requestData);
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Call the actual API to submit utility request
+      const response = await saveUtilityRequestAPI(requestData, token);
 
-      // After submission, immediately proceed to payment
-      await handlePayment();
+      if (response.success) {
+        // After successful submission, immediately proceed to payment
+        await handlePayment();
+      } else {
+        throw new Error(response.message || "Failed to submit utility form");
+      }
     } catch (error) {
-      console.error('Pay now flow error:', error);
+      console.error("Pay now flow error:", error);
       Alert.alert(
         "Action Failed",
-        "Could not proceed to payment. Please try again.",
+        error.message || "Could not proceed to payment. Please try again.",
         [{ text: "OK" }]
       );
     } finally {
@@ -754,535 +900,730 @@ const UtilityFormScreen = ({ navigation }) => {
   };
 
   const resetForm = () => {
-    setIsSwimmingPoolSelected(false);
-    setIsGymSelected(false);
-    setSwimmingPoolPaymentType("");
-    setSwimmingPoolAmount("₹0");
-    setGymPaymentType("");
-    setGymAmount("₹0");
+    setSelectedUtilities({});
+    setUtilityAmounts({});
+    setUtilityPaymentTypes({});
+    setUtilityStartDates({});
+    setUtilityEndDates({});
+    setUtilityMonths({});
+    setUtilityAmountLoading({});
     setSelectedPaymentOption("");
-    setSwimmingPoolStartDate(new Date());
-    setSwimmingPoolEndDate(new Date());
-    setGymStartDate(new Date());
-    setGymEndDate(new Date());
-    setSwimmingPoolMonths(1);
-    setGymMonths(1);
     setErrors({});
     setIsFormSubmitted(false);
   };
 
+  // Dynamic utility data state
+  const [loading, setLoading] = useState(true);
+  const [utilities, setUtilities] = useState([]);
+  const [utilityPaymentOptions, setUtilityPaymentOptions] = useState({});
+
+  const fetchUtilities = async () => {
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      const response = await getDashboardDataAPI(token);
+
+      console.log("Dashboard API Response:", response);
+
+      if (response.success && response.data && response.data.utility_list) {
+        const utilityList = response.data.utility_list;
+        console.log("Utility List:", utilityList);
+        setUtilities(utilityList);
+
+        // Parse payment options for each utility
+        const paymentOptionsMap = {};
+        utilityList.forEach((utility) => {
+          try {
+            let subUtilityDetails;
+            if (typeof utility.sub_utility_details === "string") {
+              subUtilityDetails = JSON.parse(utility.sub_utility_details);
+            } else {
+              subUtilityDetails = utility.sub_utility_details;
+            }
+
+            // Handle both object and array formats
+            let options = [];
+            if (Array.isArray(subUtilityDetails)) {
+              options = subUtilityDetails.map((item, index) => ({
+                id: index + 1,
+                value: item.name.toLowerCase().replace(/\s+/g, "_"),
+                text: item.name,
+                apiValue: item.name,
+                price: parseInt(item.price) || 0,
+              }));
+            } else if (typeof subUtilityDetails === "object") {
+              options = Object.keys(subUtilityDetails).map((key, index) => ({
+                id: index + 1,
+                value: subUtilityDetails[key].name
+                  .toLowerCase()
+                  .replace(/\s+/g, "_"),
+                text: subUtilityDetails[key].name,
+                apiValue: subUtilityDetails[key].name,
+                price: parseInt(subUtilityDetails[key].price) || 0,
+              }));
+            }
+
+            paymentOptionsMap[utility.id] = options;
+          } catch (error) {
+            console.error(
+              `Error parsing sub_utility_details for utility ${utility.id}:`,
+              error
+            );
+            paymentOptionsMap[utility.id] = [];
+          }
+        });
+
+        setUtilityPaymentOptions(paymentOptionsMap);
+        setLoading(false);
+      } else {
+        console.log("API Response structure issue:", response);
+        // Set empty utilities if no utility_list found
+        setUtilities([]);
+        setUtilityPaymentOptions({});
+        setLoading(false);
+      }
+    } catch (err) {
+      console.error("API Error:", err);
+      setUtilities([]);
+      setUtilityPaymentOptions({});
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchUtilities();
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, {
-        paddingHorizontal: getResponsivePadding(16, screenWidth),
-        paddingVertical: getResponsivePadding(15, screenWidth)
-      }]}>
+      <View
+        style={[
+          styles.header,
+          {
+            paddingHorizontal: getResponsivePadding(16, screenWidth),
+            paddingVertical: getResponsivePadding(15, screenWidth),
+          },
+        ]}
+      >
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
           <Ionicons name="arrow-back" size={24} color="#8b5cf6" />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { fontSize: getResponsiveSize(18, screenWidth) }]}>
+        <Text
+          style={[
+            styles.headerTitle,
+            { fontSize: getResponsiveSize(18, screenWidth) },
+          ]}
+        >
           Utility Services
         </Text>
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView 
-        contentContainerStyle={[styles.scrollContainer, {
-          paddingHorizontal: getResponsivePadding(16, screenWidth)
-        }]}
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContainer,
+          {
+            paddingHorizontal: getResponsivePadding(16, screenWidth),
+          },
+        ]}
         showsVerticalScrollIndicator={false}
       >
-        {/* Swimming Pool Service Section */}
-        <View style={[styles.serviceSection, {
-          padding: getResponsivePadding(20, screenWidth)
-        }]}>
-          <View style={styles.sectionHeader}>
-            <TouchableOpacity
-              style={styles.checkboxContainer}
-              onPress={() => handleSwimmingPoolSelection(!isSwimmingPoolSelected)}
-              disabled={isSubmitting || isFormSubmitted}
-              activeOpacity={0.7}
-            >
-              <View style={[
-                styles.checkbox,
-                isSwimmingPoolSelected && styles.checkboxSelected
-              ]}>
-                {isSwimmingPoolSelected && (
-                  <Ionicons name="checkmark" size={16} color="#ffffff" />
-                )}
-              </View>
-              <Text style={[styles.sectionTitle, { fontSize: getResponsiveSize(18, screenWidth) }]}>
-                Swimming Pool Membership
-              </Text>
-            </TouchableOpacity>
-          </View>
+        <TouchableOpacity
+          activeOpacity={1}
+          onPress={() => setOpenDropdown(null)}
+          style={styles.scrollContent}
+        >
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#8b5cf6" />
+              <Text style={styles.loadingText}>Loading utilities...</Text>
+            </View>
+          ) : utilities && utilities.length > 0 ? (
+            utilities.map((utility) => (
+              <View
+                key={utility.id}
+                style={[
+                  styles.serviceSection,
+                  {
+                    padding: getResponsivePadding(20, screenWidth),
+                    marginBottom: 16,
+                  },
+                ]}
+              >
+                {/* Utility Header */}
+                <View style={styles.sectionHeader}>
+                  <TouchableOpacity
+                    style={styles.checkboxContainer}
+                    onPress={() =>
+                      handleUtilitySelection(
+                        utility.id,
+                        !isUtilitySelected(utility.id)
+                      )
+                    }
+                  >
+                    <View
+                      style={[
+                        styles.checkbox,
+                        isUtilitySelected(utility.id) && styles.checkboxChecked,
+                      ]}
+                    >
+                      {isUtilitySelected(utility.id) && (
+                        <Ionicons name="checkmark" size={18} color="white" />
+                      )}
+                    </View>
+                    <Text
+                      style={[
+                        styles.serviceTitle,
+                        { fontSize: getResponsiveSize(18, screenWidth) },
+                      ]}
+                    >
+                      {utility.name}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
 
-          {/* Payment Type */}
-          <View style={styles.inputSection}>
-            <Text style={[styles.label, { fontSize: getResponsiveSize(14, screenWidth) }]}>
-              Payment Type *
-            </Text>
-            <TouchableOpacity
-              style={[styles.pickerButton, errors.swimmingPoolPaymentType && styles.inputError]}
-              onPress={() => setShowSwimmingPoolPaymentPicker(true)}
-              disabled={isSubmitting || isFormSubmitted || !isSwimmingPoolSelected || isSwimmingPoolAmountLoading}
+                {/* Always show Payment Type dropdown, but other fields only when selected */}
+                <View style={styles.inputSection}>
+                  <Text
+                    style={[
+                      styles.label,
+                      { fontSize: getResponsiveSize(14, screenWidth) },
+                    ]}
+                  >
+                    Payment Type *
+                  </Text>
+                  <View style={styles.dropdownContainer}>
+                    <TouchableOpacity
+                      style={[
+                        styles.pickerButton,
+                        !isUtilitySelected(utility.id) &&
+                          styles.pickerButtonDisabled,
+                        errors[`utility_${utility.id}_paymentType`] &&
+                          styles.inputError,
+                        openDropdown === utility.id && styles.pickerButtonOpen,
+                      ]}
+                      onPress={() => {
+                        if (isUtilitySelected(utility.id)) {
+                          setOpenDropdown(
+                            openDropdown === utility.id ? null : utility.id
+                          );
+                        }
+                      }}
+                      disabled={!isUtilitySelected(utility.id)}
+                    >
+                      <Text
+                        style={[
+                          styles.pickerButtonText,
+                          !isUtilitySelected(utility.id) &&
+                            styles.pickerButtonTextDisabled,
+                          { fontSize: getResponsiveSize(14, screenWidth) },
+                        ]}
+                      >
+                        {isUtilitySelected(utility.id) &&
+                        getUtilityPaymentType(utility.id)
+                          ? getUtilityPaymentOptions(utility.id).find(
+                              (opt) =>
+                                opt.value === getUtilityPaymentType(utility.id)
+                            )?.text || "Select Payment Type"
+                          : "Select Payment Type"}
+                      </Text>
+                      <Ionicons
+                        name={
+                          openDropdown === utility.id
+                            ? "chevron-up"
+                            : "chevron-down"
+                        }
+                        size={20}
+                        color={isUtilitySelected(utility.id) ? "#666" : "#ccc"}
+                      />
+                    </TouchableOpacity>
+
+                    {/* Dropdown Menu */}
+                    {openDropdown === utility.id &&
+                      isUtilitySelected(utility.id) && (
+                        <TouchableOpacity
+                          activeOpacity={1}
+                          onPress={(e) => e.stopPropagation()}
+                          style={styles.dropdownMenu}
+                        >
+                          {getUtilityPaymentOptions(utility.id).map(
+                            (option) => (
+                              <TouchableOpacity
+                                key={option.id}
+                                style={[
+                                  styles.dropdownItem,
+                                  getUtilityPaymentType(utility.id) ===
+                                    option.value && styles.dropdownItemSelected,
+                                ]}
+                                onPress={() => {
+                                  handleUtilityPaymentSelect(
+                                    utility.id,
+                                    option
+                                  );
+                                  setOpenDropdown(null);
+                                }}
+                              >
+                                <Text
+                                  style={[
+                                    styles.dropdownItemText,
+                                    getUtilityPaymentType(utility.id) ===
+                                      option.value &&
+                                      styles.dropdownItemTextSelected,
+                                  ]}
+                                >
+                                  {option.text}
+                                </Text>
+                              </TouchableOpacity>
+                            )
+                          )}
+                        </TouchableOpacity>
+                      )}
+                  </View>
+                  {errors[`utility_${utility.id}_paymentType`] && (
+                    <Text style={styles.errorText}>
+                      {errors[`utility_${utility.id}_paymentType`]}
+                    </Text>
+                  )}
+                </View>
+
+                {/* Show advanced fields only when utility is selected */}
+                {isUtilitySelected(utility.id) && (
+                  <>
+                    {/* Service Duration - only show when payment type is selected */}
+                    {getUtilityPaymentType(utility.id) && (
+                      <View style={styles.inputSection}>
+                        <Text
+                          style={[
+                            styles.label,
+                            { fontSize: getResponsiveSize(14, screenWidth) },
+                          ]}
+                        >
+                          Service Duration
+                        </Text>
+                        <View style={styles.dateRow}>
+                          <View style={styles.dateColumn}>
+                            <Text
+                              style={[
+                                styles.dateLabel,
+                                {
+                                  fontSize: getResponsiveSize(12, screenWidth),
+                                },
+                              ]}
+                            >
+                              Start Date
+                            </Text>
+                            <TouchableOpacity
+                              style={styles.dateButton}
+                              onPress={() => {
+                                setShowDatePicker({
+                                  utilityId: utility.id,
+                                  type: "start",
+                                });
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  styles.dateButtonText,
+                                  {
+                                    fontSize: getResponsiveSize(
+                                      14,
+                                      screenWidth
+                                    ),
+                                  },
+                                ]}
+                              >
+                                {formatDate(getUtilityStartDate(utility.id))}
+                              </Text>
+                              <Ionicons
+                                name="calendar-outline"
+                                size={20}
+                                color="#8b5cf6"
+                              />
+                            </TouchableOpacity>
+                          </View>
+                          <View style={styles.dateColumn}>
+                            <Text
+                              style={[
+                                styles.dateLabel,
+                                {
+                                  fontSize: getResponsiveSize(12, screenWidth),
+                                },
+                              ]}
+                            >
+                              End Date
+                            </Text>
+                            <TouchableOpacity
+                              style={styles.dateButton}
+                              onPress={() => {
+                                // End date is auto-calculated, so make it read-only
+                                // Could show a tooltip or info message
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  styles.dateButtonText,
+                                  {
+                                    fontSize: getResponsiveSize(
+                                      14,
+                                      screenWidth
+                                    ),
+                                  },
+                                ]}
+                              >
+                                {formatDate(getUtilityEndDate(utility.id))}
+                              </Text>
+                              <Ionicons
+                                name="calendar-outline"
+                                size={20}
+                                color="#8b5cf6"
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      </View>
+                    )}
+
+                    {/* Month Selection for Monthly Payments */}
+                    {getUtilityPaymentType(utility.id) &&
+                      getUtilityPaymentType(utility.id)
+                        .toLowerCase()
+                        .includes("monthly") && (
+                        <View style={styles.inputSection}>
+                          <Text
+                            style={[
+                              styles.label,
+                              { fontSize: getResponsiveSize(14, screenWidth) },
+                            ]}
+                          >
+                            Number of Months (1-11) *
+                          </Text>
+                          <View style={styles.dropdownContainer}>
+                            <TouchableOpacity
+                              style={[
+                                styles.pickerButton,
+                                openDropdown === `months_${utility.id}` &&
+                                  styles.pickerButtonOpen,
+                              ]}
+                              onPress={() => {
+                                setShowMonthPicker({
+                                  utilityId: utility.id,
+                                  show: true,
+                                });
+                              }}
+                            >
+                              <Text
+                                style={[
+                                  styles.pickerButtonText,
+                                  {
+                                    fontSize: getResponsiveSize(
+                                      14,
+                                      screenWidth
+                                    ),
+                                  },
+                                ]}
+                              >
+                                {getUtilityMonths(utility.id)} Month
+                                {getUtilityMonths(utility.id) > 1 ? "s" : ""}
+                              </Text>
+                              <Ionicons
+                                name="chevron-down"
+                                size={20}
+                                color="#666"
+                              />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
+                      )}
+
+                    {/* Amount Display */}
+                    {getUtilityPaymentType(utility.id) && (
+                      <View
+                        style={[
+                          styles.amountContainer,
+                          {
+                            padding: getResponsivePadding(16, screenWidth),
+                          },
+                        ]}
+                      >
+                        {utilityAmountLoading[utility.id] ? (
+                          <View style={styles.amountLoading}>
+                            <ActivityIndicator size="small" color="#8b5cf6" />
+                            <Text
+                              style={[
+                                styles.amountLoadingText,
+                                {
+                                  fontSize: getResponsiveSize(14, screenWidth),
+                                },
+                              ]}
+                            >
+                              Calculating...
+                            </Text>
+                          </View>
+                        ) : (
+                          <Text
+                            style={[
+                              styles.amountText,
+                              { fontSize: getResponsiveSize(18, screenWidth) },
+                            ]}
+                          >
+                            Amount: {getUtilityAmount(utility.id)}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </>
+                )}
+
+                {/* Department Details - Always show */}
+                <View style={styles.departmentDetails}>
+                  <Text
+                    style={[
+                      styles.departmentTitle,
+                      { fontSize: getResponsiveSize(14, screenWidth) },
+                    ]}
+                  >
+                    Department detail:
+                  </Text>
+                  <Text
+                    style={[
+                      styles.departmentText,
+                      { fontSize: getResponsiveSize(12, screenWidth) },
+                    ]}
+                  >
+                    • Email: membership@iimtrichy.ac.in
+                  </Text>
+                  <Text
+                    style={[
+                      styles.departmentText,
+                      { fontSize: getResponsiveSize(12, screenWidth) },
+                    ]}
+                  >
+                    • Phone Number: 3653747656
+                  </Text>
+                </View>
+              </View>
+            ))
+          ) : (
+            <View style={styles.noUtilitiesContainer}>
+              <Text style={styles.noUtilitiesText}>No utilities available</Text>
+            </View>
+          )}
+
+          {/* Payment Method Selection */}
+          {Object.values(selectedUtilities).some((selected) => selected) && (
+            <View
+              style={[
+                styles.serviceSection,
+                {
+                  padding: getResponsivePadding(20, screenWidth),
+                  marginBottom: 16,
+                },
+              ]}
             >
               <Text
                 style={[
-                  styles.pickerText,
-                  !swimmingPoolPaymentType && styles.placeholderText,
-                  { fontSize: getResponsiveSize(14, screenWidth) }
+                  styles.sectionTitle,
+                  { fontSize: getResponsiveSize(16, screenWidth) },
                 ]}
               >
-                {getPaymentText(swimmingPoolPaymentType, swimmingPoolPaymentOptions)}
+                Choose Payment Method:
               </Text>
-              <Ionicons name="chevron-down" size={20} color="#8b5cf6" />
-            </TouchableOpacity>
-            {errors.swimmingPoolPaymentType && (
-              <Text style={styles.errorText}>{errors.swimmingPoolPaymentType}</Text>
-            )}
-          </View>
 
-          {/* Month Selection - Only for Monthly Payment */}
-          {isSwimmingPoolSelected && swimmingPoolPaymentType === 'monthly' && (
-            <View style={styles.inputSection}>
-              <Text style={[styles.label, { fontSize: getResponsiveSize(14, screenWidth) }]}>
-                Number of Months (1-11) *
-              </Text>
-              <TouchableOpacity
-                style={styles.pickerButton}
-                onPress={() => setShowSwimmingPoolMonthPicker(true)}
-                disabled={isSubmitting || isFormSubmitted || isSwimmingPoolAmountLoading}
-              >
-                <Text style={[styles.pickerText, { fontSize: getResponsiveSize(14, screenWidth) }]}>
-                  {swimmingPoolMonths} Month{swimmingPoolMonths > 1 ? 's' : ''}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#8b5cf6" />
-              </TouchableOpacity>
+              <View style={styles.paymentOptionsContainer}>
+                {paymentProviders.map((provider) => (
+                  <TouchableOpacity
+                    key={provider.id}
+                    style={[
+                      styles.paymentOption,
+                      selectedPaymentOption === provider.value &&
+                        styles.paymentOptionSelected,
+                    ]}
+                    onPress={() => {
+                      setSelectedPaymentOption(provider.value);
+                      setErrors({ ...errors, paymentOption: "" });
+                    }}
+                  >
+                    <Ionicons name={provider.icon} size={24} color="#8b5cf6" />
+                    <Text
+                      style={[
+                        styles.paymentOptionText,
+                        { fontSize: getResponsiveSize(14, screenWidth) },
+                      ]}
+                    >
+                      {provider.text}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+
+              {errors.paymentOption && (
+                <Text style={styles.errorText}>{errors.paymentOption}</Text>
+              )}
             </View>
           )}
 
-          {/* Start Date / End Date */}
-          {isSwimmingPoolSelected && swimmingPoolPaymentType && (
-            <>
-              <Text style={[styles.label, { fontSize: getResponsiveSize(14, screenWidth) }]}>
-                Service Duration
-              </Text>
-              <View style={styles.dateRow}>
-                <View style={styles.dateContainer}>
-                  <Text style={styles.dateLabel}>Start Date</Text>
-                  <TouchableOpacity
-                    style={styles.dateButton}
-                    onPress={() => setShowSwimmingPoolStartDatePicker(true)}
-                    disabled={isSubmitting || isFormSubmitted || !isSwimmingPoolSelected}
-                  >
-                    <Text style={[styles.dateText, { fontSize: getResponsiveSize(12, screenWidth) }]}>
-                      {formatDate(swimmingPoolStartDate)}
-                    </Text>
-                    <Ionicons name="calendar-outline" size={16} color="#8b5cf6" />
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.dateContainer}>
-                  <Text style={styles.dateLabel}>End Date</Text>
-                  <TouchableOpacity
-                    style={[styles.dateButton, styles.endDateButton]}
-                    disabled={true}
-                  >
-                    <Text style={[styles.dateText, { fontSize: getResponsiveSize(12, screenWidth) }]}>
-                      {formatDate(swimmingPoolEndDate)}
-                    </Text>
-                    <Ionicons name="calendar-outline" size={16} color="#6b7280" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-              {errors.swimmingPoolEndDate && (
-                <Text style={styles.errorText}>{errors.swimmingPoolEndDate}</Text>
-              )}
-
-              {/* Amount */}
-              <View style={styles.amountContainer}>
-                <Text style={[styles.amountLabel, { fontSize: getResponsiveSize(16, screenWidth) }]}>
-                  Amount: 
-                </Text>
-                {isSwimmingPoolAmountLoading ? (
-                  <ActivityIndicator size="small" color="#1e40af" style={{ marginLeft: 8 }} />
-                ) : (
-                  <Text style={[styles.amountValue, { fontSize: getResponsiveSize(16, screenWidth) }]}>
-                    {swimmingPoolAmount}
-                  </Text>
-                )}
-              </View>
-            </>
-          )}
-
-          {/* Service Details */}
-          <View style={styles.serviceInfoContainer}>
-            <Text style={[styles.serviceInfoTitle, { fontSize: getResponsiveSize(12, screenWidth) }]}>
-              Department detail:
-            </Text>
-            <Text style={[styles.serviceInfo, { fontSize: getResponsiveSize(11, screenWidth) }]}>
-              • Email: membership@iimtichy.ac.in
-            </Text>
-            <Text style={[styles.serviceInfo, { fontSize: getResponsiveSize(11, screenWidth) }]}>
-              • Phone Number: 4312505027
-            </Text>
-          </View>
-        </View>
-
-        {/* GYM Service Section */}
-        <View style={[styles.serviceSection, {
-          padding: getResponsivePadding(20, screenWidth)
-        }]}>
-          <View style={styles.sectionHeader}>
-            <TouchableOpacity
-              style={styles.checkboxContainer}
-              onPress={() => handleGymSelection(!isGymSelected)}
-              disabled={isSubmitting || isFormSubmitted}
-              activeOpacity={0.7}
-            >
-              <View style={[
-                styles.checkbox,
-                isGymSelected && styles.checkboxSelected
-              ]}>
-                {isGymSelected && (
-                  <Ionicons name="checkmark" size={16} color="#ffffff" />
-                )}
-              </View>
-              <Text style={[styles.sectionTitle, { fontSize: getResponsiveSize(18, screenWidth) }]}>
-                GYM Membership
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Payment Type */}
-          <View style={styles.inputSection}>
-            <Text style={[styles.label, { fontSize: getResponsiveSize(14, screenWidth) }]}>
-              Payment Type *
-            </Text>
-            <TouchableOpacity
-              style={[styles.pickerButton, errors.gymPaymentType && styles.inputError]}
-              onPress={() => setShowGymPaymentPicker(true)}
-              disabled={isSubmitting || isFormSubmitted || !isGymSelected || isGymAmountLoading}
-            >
-              <Text
+          {/* Pay Now Button */}
+          {Object.values(selectedUtilities).some((selected) => selected) &&
+            selectedPaymentOption && (
+              <TouchableOpacity
                 style={[
-                  styles.pickerText,
-                  !gymPaymentType && styles.placeholderText,
-                  { fontSize: getResponsiveSize(14, screenWidth) }
+                  styles.payButton,
+                  selectedPaymentOption && styles.payButtonActive, // Green when payment option selected
+                  {
+                    marginHorizontal: getResponsivePadding(16, screenWidth),
+                    marginBottom: getResponsivePadding(20, screenWidth),
+                  },
+                  (isSubmitting || isPaymentProcessing) &&
+                    styles.payButtonDisabled,
                 ]}
+                onPress={handlePayNow}
+                disabled={isSubmitting || isPaymentProcessing}
               >
-                {getPaymentText(gymPaymentType, gymPaymentOptions)}
-              </Text>
-              <Ionicons name="chevron-down" size={20} color="#8b5cf6" />
-            </TouchableOpacity>
-            {errors.gymPaymentType && (
-              <Text style={styles.errorText}>{errors.gymPaymentType}</Text>
-            )}
-          </View>
-
-          {/* Month Selection - Only for Monthly Payment */}
-          {isGymSelected && gymPaymentType === 'monthly' && (
-            <View style={styles.inputSection}>
-              <Text style={[styles.label, { fontSize: getResponsiveSize(14, screenWidth) }]}>
-                Number of Months (1-11) *
-              </Text>
-              <TouchableOpacity
-                style={styles.pickerButton}
-                onPress={() => setShowGymMonthPicker(true)}
-                disabled={isSubmitting || isFormSubmitted || isGymAmountLoading}
-              >
-                <Text style={[styles.pickerText, { fontSize: getResponsiveSize(14, screenWidth) }]}>
-                  {gymMonths} Month{gymMonths > 1 ? 's' : ''}
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#8b5cf6" />
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Start Date / End Date */}
-          {isGymSelected && gymPaymentType && (
-            <>
-              <Text style={[styles.label, { fontSize: getResponsiveSize(14, screenWidth) }]}>
-                Service Duration
-              </Text>
-              <View style={styles.dateRow}>
-                <View style={styles.dateContainer}>
-                  <Text style={styles.dateLabel}>Start Date</Text>
-                  <TouchableOpacity
-                    style={styles.dateButton}
-                    onPress={() => setShowGymStartDatePicker(true)}
-                    disabled={isSubmitting || isFormSubmitted || !isGymSelected}
-                  >
-                    <Text style={[styles.dateText, { fontSize: getResponsiveSize(12, screenWidth) }]}>
-                      {formatDate(gymStartDate)}
+                {isSubmitting || isPaymentProcessing ? (
+                  <View style={styles.payButtonContent}>
+                    <ActivityIndicator size="small" color="white" />
+                    <Text
+                      style={[
+                        styles.payButtonText,
+                        { fontSize: getResponsiveSize(16, screenWidth) },
+                      ]}
+                    >
+                      Processing...
                     </Text>
-                    <Ionicons name="calendar-outline" size={16} color="#8b5cf6" />
-                  </TouchableOpacity>
-                </View>
-                
-                <View style={styles.dateContainer}>
-                  <Text style={styles.dateLabel}>End Date</Text>
-                  <TouchableOpacity
-                    style={[styles.dateButton, styles.endDateButton]}
-                    disabled={true}
-                  >
-                    <Text style={[styles.dateText, { fontSize: getResponsiveSize(12, screenWidth) }]}>
-                      {formatDate(gymEndDate)}
-                    </Text>
-                    <Ionicons name="calendar-outline" size={16} color="#6b7280" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-              {errors.gymEndDate && (
-                <Text style={styles.errorText}>{errors.gymEndDate}</Text>
-              )}
-
-              {/* Amount */}
-              <View style={styles.amountContainer}>
-                <Text style={[styles.amountLabel, { fontSize: getResponsiveSize(16, screenWidth) }]}>
-                  Amount: 
-                </Text>
-                {isGymAmountLoading ? (
-                  <ActivityIndicator size="small" color="#1e40af" style={{ marginLeft: 8 }} />
+                  </View>
                 ) : (
-                  <Text style={[styles.amountValue, { fontSize: getResponsiveSize(16, screenWidth) }]}>
-                    {gymAmount}
-                  </Text>
+                  <View style={styles.payButtonContent}>
+                    <Ionicons name="card-outline" size={20} color="white" />
+                    <Text
+                      style={[
+                        styles.payButtonText,
+                        { fontSize: getResponsiveSize(16, screenWidth) },
+                      ]}
+                    >
+                      Pay Fee {calculateTotalAmount()}
+                    </Text>
+                  </View>
                 )}
-              </View>
-            </>
-          )}
-
-          {/* Service Details */}
-          <View style={styles.serviceInfoContainer}>
-            <Text style={[styles.serviceInfoTitle, { fontSize: getResponsiveSize(12, screenWidth) }]}>
-              Department detail:
-            </Text>
-            <Text style={[styles.serviceInfo, { fontSize: getResponsiveSize(11, screenWidth) }]}>
-              • Email: gymmembership@limtrichy.ac.in
-            </Text>
-            <Text style={[styles.serviceInfo, { fontSize: getResponsiveSize(11, screenWidth) }]}>
-              • Phone Number: 3653747656
-            </Text>
-          </View>
-        </View>
-
-
-        {/* Payment Options */}
-        {((isSwimmingPoolSelected && swimmingPoolPaymentType) || (isGymSelected && gymPaymentType)) && (
-          <View style={[styles.paymentOptionsSection, {
-            padding: getResponsivePadding(20, screenWidth)
-          }]}>
-            <Text style={[styles.paymentOptionsTitle, { fontSize: getResponsiveSize(16, screenWidth) }]}>
-              Choose Payment Method:
-            </Text>
-            
-            <View style={styles.paymentOptionsContainer}>
-              {paymentProviders.map((provider) => (
-                <TouchableOpacity
-                  key={provider.id}
-                  style={[
-                    styles.paymentOption,
-                    selectedPaymentOption === provider.value && styles.paymentOptionSelected
-                  ]}
-                  onPress={() => {
-                    setSelectedPaymentOption(provider.value);
-                    setErrors({ ...errors, paymentOption: "" });
-                  }}
-                  disabled={isSubmitting}
-                >
-                  <Ionicons 
-                    name={provider.icon} 
-                    size={24} 
-                    color={selectedPaymentOption === provider.value ? "#7c3aed" : "#6b7280"} 
-                  />
-                  <Text style={[
-                    styles.paymentOptionText,
-                    { fontSize: getResponsiveSize(14, screenWidth) },
-                    selectedPaymentOption === provider.value && styles.paymentOptionTextSelected
-                  ]}>
-                    {provider.text}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            {errors.paymentOption && (
-              <Text style={styles.errorText}>{errors.paymentOption}</Text>
+              </TouchableOpacity>
             )}
-          </View>
-        )}
 
-        {/* General Error */}
-        {errors.general && (
-          <View style={styles.generalErrorContainer}>
-            <Ionicons name="warning" size={20} color="#ef4444" />
-            <Text style={[styles.errorText, { marginLeft: 8, marginTop: 0 }]}>{errors.general}</Text>
-          </View>
-        )}
-
-        {/* Pay Button */}
-        {((isSwimmingPoolSelected && swimmingPoolPaymentType) || (isGymSelected && gymPaymentType)) && (
-          <TouchableOpacity
+          {/* Instructions */}
+          <View
             style={[
-              styles.paymentButton, 
-              (isPaymentProcessing || !selectedPaymentOption || isSwimmingPoolAmountLoading || isGymAmountLoading) && styles.submitButtonDisabled
+              styles.instructionsContainer,
+              {
+                marginHorizontal: getResponsivePadding(16, screenWidth),
+                marginBottom: getResponsivePadding(20, screenWidth),
+              },
             ]}
-            onPress={handlePayNow}
-            disabled={isPaymentProcessing || !selectedPaymentOption || isSwimmingPoolAmountLoading || isGymAmountLoading}
           >
-            {isPaymentProcessing ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : (
-              <View style={styles.buttonContent}>
-                <Ionicons name="card" size={20} color="#ffffff" style={{ marginRight: 8 }} />
-                <Text style={[styles.paymentButtonText, { fontSize: getResponsiveSize(16, screenWidth) }]}>
-                  Pay Fee {calculateTotalAmount()}
-                </Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        )}
+            <Text
+              style={[
+                styles.instructionsText,
+                { fontSize: getResponsiveSize(12, screenWidth) },
+              ]}
+            >
+              Select your preferred membership and payment method, then click
+              the payment amount to proceed directly to payment. Your
+              application will be submitted automatically.
+            </Text>
+          </View>
 
-        {/* Footer Note */}
-        <View style={styles.footerNote}>
-          <Text style={[styles.footerNoteText, { fontSize: getResponsiveSize(12, screenWidth) }]}>
-            Select your preferred membership and payment method, then click the payment amount to proceed directly to payment. 
-            Your application will be submitted automatically.
-          </Text>
-        </View>
+          {/* General Error Display */}
+          {errors.general && (
+            <View style={styles.errorContainer}>
+              <Text style={styles.errorText}>{errors.general}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </ScrollView>
 
-      {/* Swimming Pool Payment Type Picker Modal */}
-      <Modal visible={showSwimmingPoolPaymentPicker} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowSwimmingPoolPaymentPicker(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Swimming Pool Payment</Text>
-            </View>
-            <ScrollView style={styles.modalList}>
-              {swimmingPoolPaymentOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.id}
-                  style={styles.modalItem}
-                  onPress={() => handleSwimmingPoolPaymentSelect(option)}
-                >
-                  <Text style={styles.modalItemText}>{option.text}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* GYM Payment Type Picker Modal */}
-      <Modal visible={showGymPaymentPicker} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowGymPaymentPicker(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>GYM Payment</Text>
-            </View>
-            <ScrollView style={styles.modalList}>
-              {gymPaymentOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.id}
-                  style={styles.modalItem}
-                  onPress={() => handleGymPaymentSelect(option)}
-                >
-                  <Text style={styles.modalItemText}>{option.text}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Swimming Pool Month Picker Modal */}
-      <Modal visible={showSwimmingPoolMonthPicker} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowSwimmingPoolMonthPicker(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Ionicons name="calendar" size={24} color="#0ea5e9" />
-              <Text style={styles.modalTitle}>Select Months</Text>
-            </View>
-            <ScrollView style={styles.modalList}>
-              {monthOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.id}
-                  style={styles.modalItem}
-                  onPress={() => handleSwimmingPoolMonthSelect(option)}
-                >
-                  <Text style={styles.modalItemText}>{option.text}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Gym Month Picker Modal */}
-      <Modal visible={showGymMonthPicker} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowGymMonthPicker(false)}
-        >
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Ionicons name="calendar" size={24} color="#dc2626" />
-              <Text style={styles.modalTitle}>Select Months</Text>
-            </View>
-            <ScrollView style={styles.modalList}>
-              {monthOptions.map((option) => (
-                <TouchableOpacity
-                  key={option.id}
-                  style={styles.modalItem}
-                  onPress={() => handleGymMonthSelect(option)}
-                >
-                  <Text style={styles.modalItemText}>{option.text}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Date Pickers */}
-      {showSwimmingPoolStartDatePicker && (
+      {/* Date Picker */}
+      {showDatePicker.utilityId && (
         <DateTimePicker
-          value={swimmingPoolStartDate}
+          value={getUtilityStartDate(showDatePicker.utilityId)}
           mode="date"
           display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={(event, selectedDate) => handleDateChange('swimmingPoolStart', event, selectedDate)}
+          onChange={(event, selectedDate) => {
+            setShowDatePicker({ utilityId: null, type: null });
+            if (selectedDate && showDatePicker.type === "start") {
+              handleUtilityStartDateChange(
+                showDatePicker.utilityId,
+                selectedDate
+              );
+            }
+          }}
           minimumDate={new Date()}
         />
       )}
 
-      {showGymStartDatePicker && (
-        <DateTimePicker
-          value={gymStartDate}
-          mode="date"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={(event, selectedDate) => handleDateChange('gymStart', event, selectedDate)}
-          minimumDate={new Date()}
-        />
-      )}
+      {/* Month Picker Modal */}
+      <Modal
+        visible={showMonthPicker.show}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() =>
+          setShowMonthPicker({ utilityId: null, show: false })
+        }
+      >
+        <TouchableOpacity
+          style={styles.monthModalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowMonthPicker({ utilityId: null, show: false })}
+        >
+          <TouchableOpacity
+            style={styles.monthModalContent}
+            activeOpacity={1}
+            onPress={(e) => e.stopPropagation()}
+          >
+            <View style={styles.monthModalHeader}>
+              <Ionicons name="calendar-outline" size={24} color="#3b82f6" />
+              <Text style={styles.monthModalTitle}>Select Months</Text>
+            </View>
+            <ScrollView
+              style={styles.monthModalScrollView}
+              showsVerticalScrollIndicator={false}
+            >
+              {monthOptions.map((monthOption) => (
+                <TouchableOpacity
+                  key={monthOption.id}
+                  style={[
+                    styles.monthModalOption,
+                    showMonthPicker.utilityId &&
+                      getUtilityMonths(showMonthPicker.utilityId) ===
+                        monthOption.value &&
+                      styles.monthModalOptionSelected,
+                  ]}
+                  onPress={() => {
+                    if (showMonthPicker.utilityId) {
+                      handleUtilityMonthChange(
+                        showMonthPicker.utilityId,
+                        monthOption.value
+                      );
+                    }
+                    setShowMonthPicker({ utilityId: null, show: false });
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.monthModalOptionText,
+                      showMonthPicker.utilityId &&
+                        getUtilityMonths(showMonthPicker.utilityId) ===
+                          monthOption.value &&
+                        styles.monthModalOptionTextSelected,
+                    ]}
+                  >
+                    {monthOption.text}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1319,6 +1660,9 @@ const styles = StyleSheet.create({
   scrollContainer: {
     paddingVertical: 20,
   },
+  scrollContent: {
+    flex: 1,
+  },
   serviceSection: {
     backgroundColor: "#ffffff",
     borderRadius: 12,
@@ -1338,26 +1682,33 @@ const styles = StyleSheet.create({
   checkboxContainer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "flex-start",
+    paddingVertical: 8,
   },
   checkbox: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
+    width: 28,
+    height: 28,
+    borderRadius: 8,
     borderWidth: 2,
     borderColor: "#d1d5db",
     backgroundColor: "#ffffff",
     justifyContent: "center",
     alignItems: "center",
   },
-  checkboxSelected: {
-    backgroundColor: "#7c3aed",
-    borderColor: "#7c3aed",
+  checkboxChecked: {
+    backgroundColor: "#8b5cf6",
+    borderColor: "#8b5cf6",
   },
   sectionTitle: {
     fontWeight: "600",
     color: "#374151",
     marginLeft: 8,
+  },
+  serviceTitle: {
+    fontWeight: "600",
+    color: "#374151",
+    marginLeft: 12,
+    fontSize: 18,
   },
   inputSection: {
     marginBottom: 16,
@@ -1440,6 +1791,11 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: "#1e40af",
     marginLeft: 8,
+  },
+  amountText: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#1e40af",
   },
   serviceInfoContainer: {
     backgroundColor: "#f3f4f6",
@@ -1661,6 +2017,325 @@ const styles = StyleSheet.create({
     color: "#374151",
     lineHeight: 20,
     flex: 1,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
+  },
+  noUtilitiesContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  noUtilitiesText: {
+    fontSize: 16,
+    color: "#666",
+    textAlign: "center",
+  },
+  amountLoading: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  amountLoadingText: {
+    marginLeft: 8,
+    color: "#8b5cf6",
+  },
+  paymentOptionsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    marginTop: 16,
+  },
+  paymentOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 10,
+    borderRadius: 25,
+    borderWidth: 1,
+    borderColor: "#e5e7eb",
+    backgroundColor: "#f9fafb",
+    minWidth: 120,
+    justifyContent: "center",
+  },
+  paymentOptionSelected: {
+    borderColor: "#8b5cf6",
+    backgroundColor: "#f3f4f6",
+  },
+  paymentOptionText: {
+    marginLeft: 8,
+    color: "#374151",
+    fontWeight: "500",
+  },
+  payButton: {
+    backgroundColor: "#6b7280", // Default gray color
+    borderRadius: 30,
+    paddingVertical: 16,
+    alignItems: "center",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  payButtonActive: {
+    backgroundColor: "#10b981", // Green color when payment option is selected
+    shadowColor: "#10b981",
+    shadowOpacity: 0.3,
+  },
+  payButtonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  payButtonText: {
+    color: "#ffffff",
+    fontWeight: "600",
+    marginLeft: 8,
+  },
+  payButtonDisabled: {
+    opacity: 0.6,
+  },
+  instructionsContainer: {
+    backgroundColor: "#f3f4f6",
+    padding: 16,
+    borderRadius: 8,
+  },
+  instructionsText: {
+    color: "#6b7280",
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  errorContainer: {
+    backgroundColor: "#fef2f2",
+    padding: 12,
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: "white",
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: "70%",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e5e7eb",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#374151",
+  },
+  modalCloseButton: {
+    padding: 4,
+  },
+  modalScrollView: {
+    maxHeight: 300,
+  },
+  modalOption: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+  },
+  modalOptionText: {
+    fontSize: 16,
+    color: "#374151",
+  },
+  modalOptionPrice: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#8b5cf6",
+  },
+  modalOptionSelected: {
+    backgroundColor: "#f0f9ff",
+    borderColor: "#8b5cf6",
+  },
+  modalOptionTextSelected: {
+    color: "#1e40af",
+    fontWeight: "600",
+  },
+  pickerButtonDisabled: {
+    backgroundColor: "#f9fafb",
+    borderColor: "#e5e7eb",
+  },
+  pickerButtonTextDisabled: {
+    color: "#9ca3af",
+  },
+  pickerButtonOpen: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderBottomColor: "#8b5cf6",
+  },
+  dropdownContainer: {
+    position: "relative",
+    zIndex: 1000,
+  },
+  dropdownMenu: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    maxHeight: 250, // Increased height to show more items
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    zIndex: 1001,
+  },
+
+  dropdownItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+  },
+  dropdownItemSelected: {
+    backgroundColor: "#f0f9ff",
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: "#374151",
+    flex: 1,
+  },
+  dropdownItemTextSelected: {
+    color: "#1e40af",
+    fontWeight: "500",
+  },
+  dropdownItemPrice: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#8b5cf6",
+    marginLeft: 8,
+  },
+  departmentDetails: {
+    backgroundColor: "#f8fafc",
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  departmentTitle: {
+    fontWeight: "600",
+    color: "#374151",
+    marginBottom: 8,
+  },
+  departmentText: {
+    color: "#6b7280",
+    marginBottom: 4,
+  },
+  dateRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 8,
+  },
+  dateColumn: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  dateLabel: {
+    fontSize: 12,
+    color: "#6b7280",
+    marginBottom: 4,
+  },
+  dateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 12,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 8,
+    backgroundColor: "#ffffff",
+  },
+  dateButtonText: {
+    fontSize: 14,
+    color: "#374151",
+  },
+  // Month Selection Modal Styles
+  monthModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 20,
+  },
+  monthModalContent: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    width: "100%",
+    maxWidth: 350,
+    maxHeight: "70%",
+    elevation: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+  },
+  monthModalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+    paddingHorizontal: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+  },
+  monthModalTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#1e293b",
+    marginLeft: 8,
+  },
+  monthModalScrollView: {
+    maxHeight: 400,
+  },
+  monthModalOption: {
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f8fafc",
+  },
+  monthModalOptionSelected: {
+    backgroundColor: "#f0f9ff",
+  },
+  monthModalOptionText: {
+    fontSize: 16,
+    color: "#475569",
+    fontWeight: "400",
+  },
+  monthModalOptionTextSelected: {
+    color: "#1e40af",
+    fontWeight: "500",
   },
 });
 

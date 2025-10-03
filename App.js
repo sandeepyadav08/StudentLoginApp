@@ -12,6 +12,7 @@ import HelpdeskFormScreen from './screens/HelpdeskFormScreen';
 import GrievanceScreen from './screens/GrievanceScreen';
 import GrievanceFormScreen from './screens/GrievanceFormScreen';
 import UtilityFormScreen from './screens/UtilityFormScreen';
+import PaymentGatewayScreen from './screens/PaymentGatewayScreen';
 
 const Stack = createStackNavigator();
 
@@ -64,6 +65,10 @@ export default function App() {
           <Stack.Screen 
             name="UtilityForm" 
             component={UtilityFormScreen}
+          />
+          <Stack.Screen 
+            name="PaymentGateway" 
+            component={PaymentGatewayScreen}
           />
         </Stack.Navigator>
       </NavigationContainer>
