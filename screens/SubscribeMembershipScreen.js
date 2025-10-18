@@ -14,7 +14,9 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useTheme } from "../contexts/ThemeContext";
 import {
   getUtilityAmountAPI,
   saveUtilityRequestAPI,
@@ -70,8 +72,9 @@ const calculateMembershipDates = (startDate, paymentType, months = 1) => {
   return { startDate: start, endDate: end };
 };
 
-const UtilityFormScreen = ({ navigation }) => {
+export default function SubscribeMembershipScreen({ navigation }) {
   const { width: screenWidth } = Dimensions.get("window") || { width: 375 };
+  const { colors, isDark } = useTheme();
 
   // Payment Option State
   const [selectedPaymentOption, setSelectedPaymentOption] = useState("");
@@ -105,6 +108,11 @@ const UtilityFormScreen = ({ navigation }) => {
   const [utilityEndDates, setUtilityEndDates] = useState({});
   const [utilityMonths, setUtilityMonths] = useState({});
   const [utilityAmountLoading, setUtilityAmountLoading] = useState({});
+
+  // Dynamic utility data state
+  const [loading, setLoading] = useState(true);
+  const [utilities, setUtilities] = useState([]);
+  const [utilityPaymentOptions, setUtilityPaymentOptions] = useState({});
 
   const paymentProviders = [
     { id: 1, value: "kotak", text: "Kotak Bank", icon: "card-outline" },
@@ -186,100 +194,12 @@ const UtilityFormScreen = ({ navigation }) => {
     }
   };
 
-  const updateUtilityAmount = async (utilityId, paymentType, months = 1) => {
-    try {
-      setUtilityAmountLoading((prev) => ({ ...prev, [utilityId]: true }));
-
-      const options = getUtilityPaymentOptions(utilityId);
-      const option = options.find((opt) => opt.value === paymentType);
-      if (!option) return;
-
-      const startDate = getUtilityStartDate(utilityId);
-      const endDate = getUtilityEndDate(utilityId);
-
-      const amount = await fetchUtilityAmount(
-        utilityId,
-        option.apiValue,
-        months,
-        startDate,
-        endDate
-      );
-
-      setUtilityAmounts((prev) => ({ ...prev, [utilityId]: `₹${amount}` }));
-    } catch (error) {
-      console.error(`Utility ${utilityId} amount update error:`, error);
-      setUtilityAmounts((prev) => ({ ...prev, [utilityId]: "₹0" }));
-
-      const utility = getUtilityById(utilityId);
-      const utilityName = utility ? utility.name : "utility";
-      Alert.alert(
-        "Error",
-        `Failed to fetch ${utilityName} amount. Please try again.`
-      );
-    } finally {
-      setUtilityAmountLoading((prev) => ({ ...prev, [utilityId]: false }));
-    }
-  };
-
   // Helper Functions
   const formatDate = (date) => {
     const day = String(date.getDate()).padStart(2, "0");
     const month = String(date.getMonth() + 1).padStart(2, "0");
     const year = date.getFullYear();
     return `${day}/${month}/${year}`;
-  };
-
-  const getPaymentText = (value, options) => {
-    const option = options.find((opt) => opt.value === value);
-    return option ? option.text : "Select Payment Type";
-  };
-
-  // getPaymentAmount function removed - amounts now come from API
-
-  // Annual Membership Date Logic - 12 full months (same as monthly logic with months=12)
-  // End date is the last day of the month preceding the same day next year.
-  // Example: Start: 26-09-2025 -> End: 31-08-2026
-  const calculateAnnualMembershipDates = (startDate) => {
-    const currentStartDate = new Date(startDate);
-
-    // Clone and move 12 months ahead, then set date to 0 to get
-    // the last day of the previous month (full months logic)
-    const endDate = new Date(currentStartDate);
-    endDate.setMonth(endDate.getMonth() + 12);
-    endDate.setDate(0);
-    endDate.setHours(23, 59, 59, 999);
-
-    return {
-      startDate: currentStartDate,
-      endDate: endDate,
-    };
-  };
-
-  const calculateEndDate = (startDate, paymentType, months = 1) => {
-    const newEndDate = new Date(startDate);
-
-    switch (paymentType) {
-      case "daily":
-        // For daily: End at 11:59:59 PM of the same day
-        newEndDate.setHours(23, 59, 59, 999);
-        break;
-      case "monthly":
-        // For monthly: End at last day of the target month
-        newEndDate.setMonth(newEndDate.getMonth() + months);
-        // Set to last day of the month
-        newEndDate.setDate(0); // This sets to last day of previous month (which is our target month)
-        newEndDate.setHours(23, 59, 59, 999);
-        break;
-      case "yearly":
-        // For yearly: Use academic year logic (September 26th to August 31st)
-        const academicDates = calculateAnnualMembershipDates(startDate);
-        return academicDates.endDate;
-      default:
-        // Default to daily
-        newEndDate.setHours(23, 59, 59, 999);
-    }
-
-    return newEndDate;
   };
 
   const calculateTotalAmount = () => {
@@ -435,158 +355,6 @@ const UtilityFormScreen = ({ navigation }) => {
     }
   };
 
-  const handleDateChange = (type, event, selectedDate) => {
-    if (selectedDate) {
-      switch (type) {
-        case "swimmingPoolStart":
-          setShowSwimmingPoolStartDatePicker(false);
-          setSwimmingPoolStartDate(selectedDate);
-
-          // Auto-update end date if payment type is selected
-          if (swimmingPoolPaymentType) {
-            let newEndDate;
-            if (swimmingPoolPaymentType === "yearly") {
-              // For annual payments, calculate end date as 1 year minus 1 day
-              const annualDates = calculateAnnualMembershipDates(selectedDate);
-              newEndDate = annualDates.endDate;
-            } else {
-              // For daily/monthly payments
-              const months =
-                swimmingPoolPaymentType === "monthly" ? swimmingPoolMonths : 1;
-              newEndDate = calculateEndDate(
-                selectedDate,
-                swimmingPoolPaymentType,
-                months
-              );
-            }
-            setSwimmingPoolEndDate(newEndDate);
-          }
-          break;
-        case "swimmingPoolEnd":
-          setShowSwimmingPoolEndDatePicker(false);
-          setSwimmingPoolEndDate(selectedDate);
-          break;
-        case "gymStart":
-          setShowGymStartDatePicker(false);
-          setGymStartDate(selectedDate);
-
-          // Auto-update end date if payment type is selected
-          if (gymPaymentType) {
-            let newEndDate;
-            if (gymPaymentType === "yearly") {
-              // For annual payments, calculate end date as 1 year minus 1 day
-              const annualDates = calculateAnnualMembershipDates(selectedDate);
-              newEndDate = annualDates.endDate;
-            } else {
-              // For daily/monthly payments
-              const months = gymPaymentType === "monthly" ? gymMonths : 1;
-              newEndDate = calculateEndDate(
-                selectedDate,
-                gymPaymentType,
-                months
-              );
-            }
-            setGymEndDate(newEndDate);
-          }
-          break;
-        case "gymEnd":
-          setShowGymEndDatePicker(false);
-          setGymEndDate(selectedDate);
-          break;
-      }
-    } else {
-      // Handle picker dismissal
-      setShowSwimmingPoolStartDatePicker(false);
-      setShowSwimmingPoolEndDatePicker(false);
-      setShowGymStartDatePicker(false);
-      setShowGymEndDatePicker(false);
-    }
-  };
-
-  // Month Selection Handlers
-  const handleSwimmingPoolMonthSelect = async (monthOption) => {
-    // Immediately update UI
-    setSwimmingPoolMonths(monthOption.value);
-    setShowSwimmingPoolMonthPicker(false);
-
-    // Calculate new end date first
-    const newEndDate = calculateEndDate(
-      swimmingPoolStartDate,
-      swimmingPoolPaymentType,
-      monthOption.value
-    );
-    setSwimmingPoolEndDate(newEndDate);
-
-    // Fetch new amount with updated month count from API
-    if (swimmingPoolPaymentType) {
-      const option = swimmingPoolPaymentOptions.find(
-        (opt) => opt.value === swimmingPoolPaymentType
-      );
-      if (option) {
-        try {
-          setIsSwimmingPoolAmountLoading(true);
-          const amount = await fetchUtilityAmount(
-            option.apiValue,
-            monthOption.value,
-            swimmingPoolStartDate,
-            newEndDate,
-            SWIMMING_POOL_ID
-          );
-          setSwimmingPoolAmount(`₹${amount}`);
-        } catch (error) {
-          console.error("Swimming pool amount update error:", error);
-          setSwimmingPoolAmount("₹0");
-          Alert.alert(
-            "Error",
-            "Failed to fetch swimming pool amount. Please try again."
-          );
-        } finally {
-          setIsSwimmingPoolAmountLoading(false);
-        }
-      }
-    }
-  };
-
-  const handleGymMonthSelect = async (monthOption) => {
-    // Immediately update UI
-    setGymMonths(monthOption.value);
-    setShowGymMonthPicker(false);
-
-    // Calculate new end date first
-    const newEndDate = calculateEndDate(
-      gymStartDate,
-      gymPaymentType,
-      monthOption.value
-    );
-    setGymEndDate(newEndDate);
-
-    // Fetch new amount with updated month count from API
-    if (gymPaymentType) {
-      const option = gymPaymentOptions.find(
-        (opt) => opt.value === gymPaymentType
-      );
-      if (option) {
-        try {
-          setIsGymAmountLoading(true);
-          const amount = await fetchUtilityAmount(
-            option.apiValue,
-            monthOption.value,
-            gymStartDate,
-            newEndDate,
-            GYM_ID
-          );
-          setGymAmount(`₹${amount}`);
-        } catch (error) {
-          console.error("Gym amount update error:", error);
-          setGymAmount("₹0");
-          Alert.alert("Error", "Failed to fetch gym amount. Please try again.");
-        } finally {
-          setIsGymAmountLoading(false);
-        }
-      }
-    }
-  };
-
   // Form Validation
   const validateForm = () => {
     const newErrors = {};
@@ -628,109 +396,6 @@ const UtilityFormScreen = ({ navigation }) => {
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
-
-  // Form Submission
-  const handleSubmit = async () => {
-    if (!validateForm()) return;
-
-    setIsSubmitting(true);
-    try {
-      let token;
-      try {
-        token = await AsyncStorage.getItem("userToken");
-      } catch (storageError) {
-        console.error("AsyncStorage error:", storageError);
-        Alert.alert(
-          "Error",
-          "Unable to access device storage. Please try again."
-        );
-        return;
-      }
-
-      if (!token) {
-        Alert.alert(
-          "Error",
-          "Authentication token not found. Please login again."
-        );
-        return;
-      }
-
-      const utilityData = {};
-
-      // Format data according to backend API specification
-      Object.keys(selectedUtilities).forEach((utilityId) => {
-        if (selectedUtilities[utilityId]) {
-          const utility = getUtilityById(utilityId);
-          if (utility) {
-            const paymentType = getUtilityPaymentType(utilityId);
-
-            // Map utility names to expected backend format
-            if (utility.name === "Swimming Pool Membership") {
-              utilityData.swimming_pool = {
-                payment_type: paymentType,
-                start_date: formatDate(getUtilityStartDate(utilityId)),
-                end_date: formatDate(getUtilityEndDate(utilityId)),
-                amount: getUtilityAmount(utilityId),
-                months:
-                  paymentType === "monthly"
-                    ? getUtilityMonths(utilityId)
-                    : undefined,
-              };
-            } else if (utility.name === "GYM Membership") {
-              utilityData.gym = {
-                payment_type: paymentType,
-                start_date: formatDate(getUtilityStartDate(utilityId)),
-                end_date: formatDate(getUtilityEndDate(utilityId)),
-                amount: getUtilityAmount(utilityId),
-                months:
-                  paymentType === "monthly"
-                    ? getUtilityMonths(utilityId)
-                    : undefined,
-              };
-            }
-          }
-        }
-      });
-
-      const requestData = {
-        ...utilityData,
-        payment_option: selectedPaymentOption,
-        total_amount: calculateTotalAmount(),
-        timestamp: new Date().toISOString(),
-      };
-
-      console.log("Utility Form Data:", requestData);
-
-      // Call the actual API
-      const response = await saveUtilityRequestAPI(requestData, token);
-
-      if (response.success) {
-        Alert.alert(
-          "Success",
-          "Your utility form has been submitted successfully! You can now proceed to payment.",
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                setIsFormSubmitted(true);
-              },
-            },
-          ]
-        );
-      } else {
-        throw new Error(response.message || "Failed to submit utility form");
-      }
-    } catch (error) {
-      console.error("Utility form submission error:", error);
-      Alert.alert(
-        "Submission Failed",
-        error.message || "Failed to submit utility form. Please try again.",
-        [{ text: "OK" }]
-      );
-    } finally {
-      setIsSubmitting(false);
-    }
   };
 
   // Payment Processing
@@ -912,17 +577,10 @@ const UtilityFormScreen = ({ navigation }) => {
     setIsFormSubmitted(false);
   };
 
-  // Dynamic utility data state
-  const [loading, setLoading] = useState(true);
-  const [utilities, setUtilities] = useState([]);
-  const [utilityPaymentOptions, setUtilityPaymentOptions] = useState({});
-
   const fetchUtilities = async () => {
     try {
       const token = await AsyncStorage.getItem("userToken");
       const response = await getDashboardDataAPI(token);
-
-      console.log("Dashboard API Response:", response);
 
       if (response.success && response.data && response.data.utility_list) {
         const utilityList = response.data.utility_list;
@@ -994,12 +652,17 @@ const UtilityFormScreen = ({ navigation }) => {
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
+      <StatusBar style={isDark ? "light" : "dark"} />
       {/* Header */}
       <View
         style={[
           styles.header,
           {
+            backgroundColor: colors.surface,
+            borderBottomColor: colors.border,
             paddingHorizontal: getResponsivePadding(16, screenWidth),
             paddingVertical: getResponsivePadding(15, screenWidth),
           },
@@ -1009,15 +672,18 @@ const UtilityFormScreen = ({ navigation }) => {
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color="#8b5cf6" />
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
         <Text
           style={[
             styles.headerTitle,
-            { fontSize: getResponsiveSize(18, screenWidth) },
+            {
+              color: colors.primary,
+              fontSize: getResponsiveSize(18, screenWidth),
+            },
           ]}
         >
-          Utility Services
+          Subscribe Membership
         </Text>
         <View style={styles.placeholder} />
       </View>
@@ -1038,8 +704,12 @@ const UtilityFormScreen = ({ navigation }) => {
         >
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color="#8b5cf6" />
-              <Text style={styles.loadingText}>Loading utilities...</Text>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text
+                style={[styles.loadingText, { color: colors.textSecondary }]}
+              >
+                Loading utilities...
+              </Text>
             </View>
           ) : utilities && utilities.length > 0 ? (
             utilities.map((utility) => (
@@ -1048,6 +718,7 @@ const UtilityFormScreen = ({ navigation }) => {
                 style={[
                   styles.serviceSection,
                   {
+                    backgroundColor: colors.surface,
                     padding: getResponsivePadding(20, screenWidth),
                     marginBottom: 16,
                   },
@@ -1077,7 +748,10 @@ const UtilityFormScreen = ({ navigation }) => {
                     <Text
                       style={[
                         styles.serviceTitle,
-                        { fontSize: getResponsiveSize(18, screenWidth) },
+                        {
+                          color: colors.text,
+                          fontSize: getResponsiveSize(18, screenWidth),
+                        },
                       ]}
                     >
                       {utility.name}
@@ -1090,7 +764,10 @@ const UtilityFormScreen = ({ navigation }) => {
                   <Text
                     style={[
                       styles.label,
-                      { fontSize: getResponsiveSize(14, screenWidth) },
+                      {
+                        color: colors.text,
+                        fontSize: getResponsiveSize(14, screenWidth),
+                      },
                     ]}
                   >
                     Payment Type *
@@ -1099,6 +776,10 @@ const UtilityFormScreen = ({ navigation }) => {
                     <TouchableOpacity
                       style={[
                         styles.pickerButton,
+                        {
+                          backgroundColor: colors.surface,
+                          borderColor: colors.border,
+                        },
                         !isUtilitySelected(utility.id) &&
                           styles.pickerButtonDisabled,
                         errors[`utility_${utility.id}_paymentType`] &&
@@ -1117,6 +798,11 @@ const UtilityFormScreen = ({ navigation }) => {
                       <Text
                         style={[
                           styles.pickerButtonText,
+                          {
+                            color: isUtilitySelected(utility.id)
+                              ? colors.text
+                              : colors.textTertiary,
+                          },
                           !isUtilitySelected(utility.id) &&
                             styles.pickerButtonTextDisabled,
                           { fontSize: getResponsiveSize(14, screenWidth) },
@@ -1137,7 +823,11 @@ const UtilityFormScreen = ({ navigation }) => {
                             : "chevron-down"
                         }
                         size={20}
-                        color={isUtilitySelected(utility.id) ? "#666" : "#ccc"}
+                        color={
+                          isUtilitySelected(utility.id)
+                            ? colors.text
+                            : colors.textTertiary
+                        }
                       />
                     </TouchableOpacity>
 
@@ -1147,7 +837,13 @@ const UtilityFormScreen = ({ navigation }) => {
                         <TouchableOpacity
                           activeOpacity={1}
                           onPress={(e) => e.stopPropagation()}
-                          style={styles.dropdownMenu}
+                          style={[
+                            styles.dropdownMenu,
+                            {
+                              backgroundColor: colors.surface,
+                              borderColor: colors.border,
+                            },
+                          ]}
                         >
                           {getUtilityPaymentOptions(utility.id).map(
                             (option) => (
@@ -1169,9 +865,14 @@ const UtilityFormScreen = ({ navigation }) => {
                                 <Text
                                   style={[
                                     styles.dropdownItemText,
+                                    {
+                                      color: colors.text,
+                                    },
                                     getUtilityPaymentType(utility.id) ===
-                                      option.value &&
-                                      styles.dropdownItemTextSelected,
+                                      option.value && {
+                                      color: colors.primary,
+                                      fontWeight: "500",
+                                    },
                                   ]}
                                 >
                                   {option.text}
@@ -1183,7 +884,7 @@ const UtilityFormScreen = ({ navigation }) => {
                       )}
                   </View>
                   {errors[`utility_${utility.id}_paymentType`] && (
-                    <Text style={styles.errorText}>
+                    <Text style={[styles.errorText, { color: colors.error }]}>
                       {errors[`utility_${utility.id}_paymentType`]}
                     </Text>
                   )}
@@ -1198,7 +899,10 @@ const UtilityFormScreen = ({ navigation }) => {
                         <Text
                           style={[
                             styles.label,
-                            { fontSize: getResponsiveSize(14, screenWidth) },
+                            {
+                              fontSize: getResponsiveSize(14, screenWidth),
+                              color: colors.text,
+                            },
                           ]}
                         >
                           Service Duration
@@ -1210,13 +914,20 @@ const UtilityFormScreen = ({ navigation }) => {
                                 styles.dateLabel,
                                 {
                                   fontSize: getResponsiveSize(12, screenWidth),
+                                  color: colors.textSecondary,
                                 },
                               ]}
                             >
                               Start Date
                             </Text>
                             <TouchableOpacity
-                              style={styles.dateButton}
+                              style={[
+                                styles.dateButton,
+                                {
+                                  backgroundColor: colors.surface,
+                                  borderColor: colors.border,
+                                },
+                              ]}
                               onPress={() => {
                                 setShowDatePicker({
                                   utilityId: utility.id,
@@ -1232,6 +943,7 @@ const UtilityFormScreen = ({ navigation }) => {
                                       14,
                                       screenWidth
                                     ),
+                                    color: colors.text,
                                   },
                                 ]}
                               >
@@ -1250,13 +962,20 @@ const UtilityFormScreen = ({ navigation }) => {
                                 styles.dateLabel,
                                 {
                                   fontSize: getResponsiveSize(12, screenWidth),
+                                  color: colors.textSecondary,
                                 },
                               ]}
                             >
                               End Date
                             </Text>
                             <TouchableOpacity
-                              style={styles.dateButton}
+                              style={[
+                                styles.dateButton,
+                                {
+                                  backgroundColor: colors.surface,
+                                  borderColor: colors.border,
+                                },
+                              ]}
                               onPress={() => {
                                 // End date is auto-calculated, so make it read-only
                                 // Could show a tooltip or info message
@@ -1270,6 +989,7 @@ const UtilityFormScreen = ({ navigation }) => {
                                       14,
                                       screenWidth
                                     ),
+                                    color: colors.text,
                                   },
                                 ]}
                               >
@@ -1295,7 +1015,10 @@ const UtilityFormScreen = ({ navigation }) => {
                           <Text
                             style={[
                               styles.label,
-                              { fontSize: getResponsiveSize(14, screenWidth) },
+                              {
+                                fontSize: getResponsiveSize(14, screenWidth),
+                                color: colors.text,
+                              },
                             ]}
                           >
                             Number of Months (1-11) *
@@ -1304,6 +1027,10 @@ const UtilityFormScreen = ({ navigation }) => {
                             <TouchableOpacity
                               style={[
                                 styles.pickerButton,
+                                {
+                                  backgroundColor: colors.surface,
+                                  borderColor: colors.border,
+                                },
                                 openDropdown === `months_${utility.id}` &&
                                   styles.pickerButtonOpen,
                               ]}
@@ -1322,6 +1049,7 @@ const UtilityFormScreen = ({ navigation }) => {
                                       14,
                                       screenWidth
                                     ),
+                                    color: colors.text,
                                   },
                                 ]}
                               >
@@ -1331,7 +1059,7 @@ const UtilityFormScreen = ({ navigation }) => {
                               <Ionicons
                                 name="chevron-down"
                                 size={20}
-                                color="#666"
+                                color={colors.textSecondary}
                               />
                             </TouchableOpacity>
                           </View>
@@ -1408,7 +1136,14 @@ const UtilityFormScreen = ({ navigation }) => {
             ))
           ) : (
             <View style={styles.noUtilitiesContainer}>
-              <Text style={styles.noUtilitiesText}>No utilities available</Text>
+              <Text
+                style={[
+                  styles.noUtilitiesText,
+                  { color: colors.textSecondary },
+                ]}
+              >
+                No utilities available
+              </Text>
             </View>
           )}
 
@@ -1418,6 +1153,7 @@ const UtilityFormScreen = ({ navigation }) => {
               style={[
                 styles.serviceSection,
                 {
+                  backgroundColor: colors.surface,
                   padding: getResponsivePadding(20, screenWidth),
                   marginBottom: 16,
                 },
@@ -1426,7 +1162,10 @@ const UtilityFormScreen = ({ navigation }) => {
               <Text
                 style={[
                   styles.sectionTitle,
-                  { fontSize: getResponsiveSize(16, screenWidth) },
+                  {
+                    fontSize: getResponsiveSize(16, screenWidth),
+                    color: colors.text,
+                  },
                 ]}
               >
                 Choose Payment Method:
@@ -1580,7 +1319,7 @@ const UtilityFormScreen = ({ navigation }) => {
             onPress={(e) => e.stopPropagation()}
           >
             <View style={styles.monthModalHeader}>
-              <Ionicons name="calendar-outline" size={24} color="#3b82f6" />
+              <Ionicons name="calendar-outline" size={24} color="#374151" />
               <Text style={styles.monthModalTitle}>Select Months</Text>
             </View>
             <ScrollView
@@ -1626,20 +1365,17 @@ const UtilityFormScreen = ({ navigation }) => {
       </Modal>
     </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#ffffff",
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
     elevation: 2,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
@@ -1652,7 +1388,6 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontWeight: "600",
-    color: "#7c3aed",
   },
   placeholder: {
     width: 40,
@@ -1664,7 +1399,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   serviceSection: {
-    backgroundColor: "#ffffff",
     borderRadius: 12,
     marginBottom: 16,
     elevation: 2,
@@ -1706,7 +1440,6 @@ const styles = StyleSheet.create({
   },
   serviceTitle: {
     fontWeight: "600",
-    color: "#374151",
     marginLeft: 12,
     fontSize: 18,
   },
@@ -1715,7 +1448,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontWeight: "500",
-    color: "#374151",
     marginBottom: 8,
   },
   pickerButton: {
@@ -1729,50 +1461,93 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: "#f9fafb",
   },
-  pickerText: {
+  pickerButtonText: {
     color: "#374151",
     flex: 1,
   },
-  placeholderText: {
+  pickerButtonDisabled: {
+    backgroundColor: "#f9fafb",
+    borderColor: "#e5e7eb",
+  },
+  pickerButtonTextDisabled: {
     color: "#9ca3af",
+  },
+  pickerButtonOpen: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderBottomColor: "#8b5cf6",
   },
   inputError: {
     borderColor: "#ef4444",
     backgroundColor: "#fef2f2",
   },
+  dropdownContainer: {
+    position: "relative",
+    zIndex: 1000,
+  },
+  dropdownMenu: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    maxHeight: 250,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    zIndex: 1001,
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f3f4f6",
+  },
+  dropdownItemSelected: {
+    backgroundColor: "#f0f9ff",
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: "#374151",
+    flex: 1,
+  },
   dateRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginTop: 8,
   },
-  dateContainer: {
+  dateColumn: {
     flex: 1,
     marginHorizontal: 4,
   },
   dateLabel: {
     fontSize: 12,
-    fontWeight: "500",
     color: "#6b7280",
     marginBottom: 4,
   },
   dateButton: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    justifyContent: "space-between",
+    padding: 12,
     borderWidth: 1,
     borderColor: "#d1d5db",
     borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#ffffff",
   },
-  endDateButton: {
-    backgroundColor: "#f3f4f6",
-    borderColor: "#e5e7eb",
-  },
-  dateText: {
+  dateButtonText: {
+    fontSize: 14,
     color: "#374151",
-    flex: 1,
   },
   amountContainer: {
     flexDirection: "row",
@@ -1783,240 +1558,34 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     marginBottom: 16,
   },
-  amountLabel: {
-    fontWeight: "500",
-    color: "#1e40af",
-  },
-  amountValue: {
-    fontWeight: "600",
-    color: "#1e40af",
-    marginLeft: 8,
-  },
   amountText: {
     fontSize: 18,
     fontWeight: "600",
     color: "#1e40af",
   },
-  serviceInfoContainer: {
-    backgroundColor: "#f3f4f6",
-    padding: 12,
-    borderRadius: 8,
-  },
-  serviceInfoTitle: {
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 4,
-  },
-  serviceInfo: {
-    color: "#6b7280",
-    marginBottom: 2,
-  },
-  totalAmountSection: {
-    backgroundColor: "#dbeafe",
-    borderRadius: 12,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  totalAmountHeader: {
+  amountLoading: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
+  },
+  amountLoadingText: {
+    marginLeft: 8,
+    color: "#8b5cf6",
+  },
+  departmentDetails: {
+    backgroundColor: "#f8fafc",
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  departmentTitle: {
+    fontWeight: "600",
+    color: "#374151",
     marginBottom: 8,
   },
-  totalAmountLabel: {
-    fontWeight: "600",
-    color: "#1e40af",
-    marginLeft: 8,
-  },
-  totalAmountValue: {
-    fontWeight: "700",
-    color: "#1e40af",
-    textAlign: "center",
-  },
-  paymentOptionsSection: {
-    backgroundColor: "#ffffff",
-    borderRadius: 12,
-    marginBottom: 16,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  paymentOptionsTitle: {
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 16,
-  },
-  paymentOptionsContainer: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-  },
-  paymentOption: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 9,
-    borderRadius: 40,
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    minWidth: 120,
-    backgroundColor: "#f9fafb",
-  },
-  paymentOptionSelected: {
-    borderColor: "#7c3aed",
-    backgroundColor: "#f3f4f6",
-  },
-  paymentOptionText: {
-    color: "#374151",
-    fontWeight: "500",
-    marginLeft: 8,
-    flex: 1,
-    flexWrap: "wrap",
-  },
-  paymentOptionTextSelected: {
-    color: "#7c3aed",
-  },
-  generalErrorContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fef2f2",
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#fecaca",
-  },
-  errorText: {
-    fontSize: 12,
-    color: "#ef4444",
-    marginTop: 4,
-  },
-  submitButton: {
-    backgroundColor: "#7c3aed",
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginBottom: 16,
-    elevation: 3,
-    shadowColor: "#7c3aed",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  submitButtonDisabled: {
-    backgroundColor: "#9ca3af",
-    elevation: 0,
-    shadowOpacity: 0,
-  },
-  buttonContent: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  submitButtonText: {
-    color: "#ffffff",
-    fontWeight: "600",
-  },
-  successMessageContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#d1fae5",
-    borderRadius: 8,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#10b981",
-  },
-  successMessage: {
-    color: "#065f46",
-    fontWeight: "600",
-    marginLeft: 8,
-  },
-  paymentButton: {
-    backgroundColor: "#059669",
-    borderRadius: 8,
-    paddingVertical: 16,
-    alignItems: "center",
-    marginBottom: 12,
-    elevation: 3,
-    shadowColor: "#059669",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  paymentButtonText: {
-    color: "#ffffff",
-    fontWeight: "600",
-  },
-  backToMenuButton: {
-    backgroundColor: "transparent",
-    borderRadius: 8,
-    paddingVertical: 12,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#6b7280",
-  },
-  backToMenuButtonText: {
+  departmentText: {
     color: "#6b7280",
-    fontWeight: "500",
-  },
-  footerNote: {
-    backgroundColor: "#f3f4f6",
-    padding: 16,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  footerNoteText: {
-    color: "#6b7280",
-    textAlign: "center",
-    lineHeight: 18,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    backgroundColor: "#ffffff",
-    borderRadius: 12,
-    padding: 20,
-    width: width * 0.9,
-    maxHeight: "70%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#374151",
-    marginLeft: 8,
-  },
-  modalList: {
-    maxHeight: 300,
-  },
-  modalItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-  },
-  modalItemText: {
-    fontSize: 14,
-    color: "#374151",
-    lineHeight: 20,
-    flex: 1,
+    marginBottom: 4,
   },
   loadingContainer: {
     flex: 1,
@@ -2027,7 +1596,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: "#666",
   },
   noUtilitiesContainer: {
     flex: 1,
@@ -2037,17 +1605,7 @@ const styles = StyleSheet.create({
   },
   noUtilitiesText: {
     fontSize: 16,
-    color: "#666",
     textAlign: "center",
-  },
-  amountLoading: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  amountLoadingText: {
-    marginLeft: 8,
-    color: "#8b5cf6",
   },
   paymentOptionsContainer: {
     flexDirection: "row",
@@ -2120,166 +1678,10 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginBottom: 16,
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: "white",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: "70%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#374151",
-  },
-  modalCloseButton: {
-    padding: 4,
-  },
-  modalScrollView: {
-    maxHeight: 300,
-  },
-  modalOption: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-  },
-  modalOptionText: {
-    fontSize: 16,
-    color: "#374151",
-  },
-  modalOptionPrice: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#8b5cf6",
-  },
-  modalOptionSelected: {
-    backgroundColor: "#f0f9ff",
-    borderColor: "#8b5cf6",
-  },
-  modalOptionTextSelected: {
-    color: "#1e40af",
-    fontWeight: "600",
-  },
-  pickerButtonDisabled: {
-    backgroundColor: "#f9fafb",
-    borderColor: "#e5e7eb",
-  },
-  pickerButtonTextDisabled: {
-    color: "#9ca3af",
-  },
-  pickerButtonOpen: {
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    borderBottomColor: "#8b5cf6",
-  },
-  dropdownContainer: {
-    position: "relative",
-    zIndex: 1000,
-  },
-  dropdownMenu: {
-    position: "absolute",
-    top: "100%",
-    left: 0,
-    right: 0,
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderTopWidth: 0,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-    maxHeight: 250, // Increased height to show more items
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    zIndex: 1001,
-  },
-
-  dropdownItem: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-  },
-  dropdownItemSelected: {
-    backgroundColor: "#f0f9ff",
-  },
-  dropdownItemText: {
-    fontSize: 14,
-    color: "#374151",
-    flex: 1,
-  },
-  dropdownItemTextSelected: {
-    color: "#1e40af",
-    fontWeight: "500",
-  },
-  dropdownItemPrice: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#8b5cf6",
-    marginLeft: 8,
-  },
-  departmentDetails: {
-    backgroundColor: "#f8fafc",
-    padding: 12,
-    borderRadius: 8,
-    marginTop: 16,
-  },
-  departmentTitle: {
-    fontWeight: "600",
-    color: "#374151",
-    marginBottom: 8,
-  },
-  departmentText: {
-    color: "#6b7280",
-    marginBottom: 4,
-  },
-  dateRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 8,
-  },
-  dateColumn: {
-    flex: 1,
-    marginHorizontal: 4,
-  },
-  dateLabel: {
+  errorText: {
     fontSize: 12,
-    color: "#6b7280",
-    marginBottom: 4,
-  },
-  dateButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 12,
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 8,
-    backgroundColor: "#ffffff",
-  },
-  dateButtonText: {
-    fontSize: 14,
-    color: "#374151",
+    marginTop: 4,
+    color: "#ef4444",
   },
   // Month Selection Modal Styles
   monthModalOverlay: {
@@ -2338,5 +1740,3 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
 });
-
-export default UtilityFormScreen;

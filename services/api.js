@@ -1,7 +1,7 @@
 //import jwtDecode from "jwt-decode";
 
 // API Service for Student Login App
-const API_BASE_URL = "http://192.168.29.217/iimt-application/api/portal";
+const API_BASE_URL = "http://192.168.29.216/iimt-application/api/portal/";
 
 // Read User API
 export const readUserAPI = async (token) => {
@@ -28,7 +28,7 @@ export const readUserAPI = async (token) => {
 
     return {
       success: true,
-      user: data.data || data.user,
+      user: data.data?.data || data.data || data.user,
       message: data.message || "User data fetched successfully",
     };
   } catch (error) {
@@ -608,7 +608,12 @@ export const validateTokenAPI = async (token) => {
 };
 
 // Payment History API - fetch all records in batches
-export const getPaymentHistoryAPI = async (token, paymentStatus = "", start = 0, length = 20) => {
+export const getPaymentHistoryAPI = async (
+  token,
+  paymentStatus = "",
+  start = 0,
+  length = 20
+) => {
   const formData = new FormData();
   formData.append("payment_status", paymentStatus);
   formData.append("payment_type", 7);
@@ -665,13 +670,13 @@ export const getPaymentHistoryAPI = async (token, paymentStatus = "", start = 0,
       };
     });
 
-    return { 
-      success: true, 
-      data: history, 
+    return {
+      success: true,
+      data: history,
       message: data.message,
       totalRecords: data.res?.recordsTotal || history.length,
       filteredRecords: data.res?.recordsFiltered || history.length,
-      hasMore: history.length === length // If we got full batch, there might be more
+      hasMore: history.length === length, // If we got full batch, there might be more
     };
   } catch (error) {
     throw {
@@ -680,7 +685,6 @@ export const getPaymentHistoryAPI = async (token, paymentStatus = "", start = 0,
     };
   }
 };
-
 
 // Get Dashboard Data API (includes utility list and term buttons)
 export const getDashboardDataAPI = async (token) => {
@@ -845,6 +849,12 @@ export const logoutAPI = async (token) => {
     });
 
     const data = await response.json();
+    
+    console.log("Logout Response:", {
+      status: response.status,
+      ok: response.ok,
+      data: data,
+    });
 
     if (!response.ok) {
       throw new Error(data.message || "Logout failed");
@@ -855,6 +865,7 @@ export const logoutAPI = async (token) => {
       message: data.message || "Logged out successfully",
     };
   } catch (error) {
+    console.error("Logout Error:", error);
     throw {
       success: false,
       message: error.message || "Network error occurred",
@@ -1490,31 +1501,31 @@ export const getHelpdeskTicketsAPI = async (token, page = 0, limit = 10) => {
 //     }
 // };
 
-export const getutilitylist = async (token) => {
-  try {
-    const response = await fetch(`${API_BASE_URL}/dashboard`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    });
+// export const getutilitylist = async (token) => {
+//   try {
+//     const response = await fetch(`${API_BASE_URL}/dashboard`, {
+//       method: "POST",
+//       headers: {
+//         Authorization: `Bearer ${token}`,
+//         "Content-Type": "application/json",
+//       },
+//     });
 
-    const data = await response.json();
+//     const data = await response.json();
 
-    if (!response.ok || (data.status !== 200 && data.status !== 201)) {
-      throw new Error(data.message || "Failed to fetch categories");
-    }
+//     if (!response.ok || (data.status !== 200 && data.status !== 201)) {
+//       throw new Error(data.message || "Failed to fetch categories");
+//     }
 
-    console.log("kjljolkkp", data.res.utility_list);
+//     console.log("kjljolkkp", data.res.utility_list);
 
-    return {
-      success: true,
-      utility_list: data.res.utility_list[0],
-      message: data.message || "Categories fetched successfully",
-    };
-  } catch (error) {
-    console.error("Get Categories Error:", error);
-    throw new Error(error.message || "Failed to fetch categories");
-  }
-};
+//     return {
+//       success: true,
+//       utility_list: data.res.utility_list[0],
+//       message: data.message || "Categories fetched successfully",
+//     };
+//   } catch (error) {
+//     console.error("Get Categories Error:", error);
+//     throw new Error(error.message || "Failed to fetch categories");
+//   }
+// };

@@ -1,7 +1,7 @@
 // Real dashboard data API service
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const API_BASE_URL = "http://192.168.29.217/iimt-application/api/portal";
+const API_BASE_URL = "http://192.168.29.216/iimt-application/api/portal/";
 
 // Helper function to get auth token
 const getAuthToken = async () => {

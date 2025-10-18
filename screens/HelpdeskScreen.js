@@ -15,12 +15,15 @@ import {
   useSafeAreaInsets,
   SafeAreaView,
 } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getHelpdeskTicketsAPI, getCategoriesAPI } from '../services/api';
 import HelpdeskFormScreen from './HelpdeskFormScreen';
+import { useTheme } from '../contexts/ThemeContext';
 
 const HelpdeskScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const { colors, isDark } = useTheme();
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -171,32 +174,32 @@ const HelpdeskScreen = ({ navigation }) => {
 
 
   const TicketCard = ({ ticket }) => (
-    <View style={styles.ticketCard}>
+    <View style={[styles.ticketCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <View style={styles.ticketHeader}>
         <View style={styles.ticketInfo}>
-          <Text style={styles.ticketId}>{ticket.ticketId}</Text>
+          <Text style={[styles.ticketId, { color: colors.primary }]}>{ticket.ticketId}</Text>
           <View style={[styles.statusBadge, { backgroundColor: getStatusColor(ticket.status) }]}>
             <Text style={styles.statusText}>{getStatusLabel(ticket.status)}</Text>
           </View>
         </View>
         <View style={styles.dateContainer}>
-          <Ionicons name="time-outline" size={14} color="#6b7280" />
-          <Text style={styles.ticketDate}>
+          <Ionicons name="time-outline" size={14} color={colors.textTertiary} />
+          <Text style={[styles.ticketDate, { color: colors.textSecondary }]}>
             {new Date(ticket.createdAt || Date.now()).toLocaleDateString()}
           </Text>
         </View>
       </View>
       
-      <Text style={styles.ticketDescription} numberOfLines={3}>
+      <Text style={[styles.ticketDescription, { color: colors.text }]} numberOfLines={3}>
         {ticket.description}
       </Text>
       
       {ticket.startDatetime && (
-        <View style={styles.scheduleContainer}>
-          <Ionicons name="calendar-outline" size={16} color="#8b5cf6" />
+        <View style={[styles.scheduleContainer, { backgroundColor: colors.surfaceVariant }]}>
+          <Ionicons name="calendar-outline" size={16} color={colors.primary} />
           <View style={styles.scheduleInfo}>
-            <Text style={styles.scheduleLabel}>Scheduled</Text>
-            <Text style={styles.scheduleText}>
+            <Text style={[styles.scheduleLabel, { color: colors.primary }]}>Scheduled</Text>
+            <Text style={[styles.scheduleText, { color: colors.text }]}>
               {new Date(ticket.startDatetime).toLocaleString()}
               {ticket.endDatetime && ` - ${new Date(ticket.endDatetime).toLocaleTimeString()}`}
             </Text>
@@ -205,17 +208,17 @@ const HelpdeskScreen = ({ navigation }) => {
       )}
       
       {ticket.docFile && (
-        <View style={styles.attachmentContainer}>
-          <Ionicons name="attach" size={16} color="#059669" />
-          <Text style={styles.attachmentText}>Document attached</Text>
+        <View style={[styles.attachmentContainer, { backgroundColor: colors.successContainer }]}>
+          <Ionicons name="attach" size={16} color={colors.success} />
+          <Text style={[styles.attachmentText, { color: colors.success }]}>Document attached</Text>
         </View>
       )}
       
       <View style={styles.ticketFooter}>
         <View style={styles.ticketMeta}>
-          <Text style={styles.ticketMetaText}>ID: {ticket.id}</Text>
-          <Text style={styles.ticketMetaText}>•</Text>
-          <Text style={styles.ticketMetaText}>{formatCategoryDisplay(ticket.category, ticket.subCategory)}</Text>
+          <Text style={[styles.ticketMetaText, { color: colors.textTertiary }]}>ID: {ticket.id}</Text>
+          <Text style={[styles.ticketMetaText, { color: colors.textTertiary }]}>•</Text>
+          <Text style={[styles.ticketMetaText, { color: colors.textTertiary }]}>{formatCategoryDisplay(ticket.category, ticket.subCategory)}</Text>
         </View>
       </View>
     </View>
@@ -223,9 +226,9 @@ const HelpdeskScreen = ({ navigation }) => {
 
   const EmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="ticket-outline" size={64} color="#d1d5db" />
-      <Text style={styles.emptyStateTitle}>No Helpdesk Tickets</Text>
-      <Text style={styles.emptyStateText}>
+      <Ionicons name="ticket-outline" size={64} color={colors.textTertiary} />
+      <Text style={[styles.emptyStateTitle, { color: colors.text }]}>No Helpdesk Tickets</Text>
+      <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
         You haven't created any helpdesk tickets yet. Tap the create button below to submit your first ticket.
       </Text>
     </View>
@@ -233,25 +236,26 @@ const HelpdeskScreen = ({ navigation }) => {
 
   const ErrorState = () => (
     <View style={styles.errorState}>
-      <Ionicons name="alert-circle-outline" size={64} color="#dc2626" />
-      <Text style={styles.errorTitle}>Unable to Load Tickets</Text>
-      <Text style={styles.errorText}>{error}</Text>
-      <TouchableOpacity style={styles.retryButton} onPress={loadTickets}>
-        <Text style={styles.retryButtonText}>Try Again</Text>
+      <Ionicons name="alert-circle-outline" size={64} color={colors.error} />
+      <Text style={[styles.errorTitle, { color: colors.error }]}>Unable to Load Tickets</Text>
+      <Text style={[styles.errorText, { color: colors.textSecondary }]}>{error}</Text>
+      <TouchableOpacity style={[styles.retryButton, { backgroundColor: colors.primary }]} onPress={loadTickets}>
+        <Text style={[styles.retryButtonText, { color: colors.onPrimary }]}>Try Again</Text>
       </TouchableOpacity>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
         >
-          <Ionicons name="arrow-back" size={24} color="#8b5cf6" />
+          <Ionicons name="arrow-back" size={24} color={colors.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Helpdesk Tickets</Text>
+        <Text style={[styles.headerTitle, { color: colors.primary }]}>Helpdesk Tickets</Text>
         <TouchableOpacity
           onPress={onRefresh}
           style={styles.refreshButton}
@@ -260,15 +264,15 @@ const HelpdeskScreen = ({ navigation }) => {
           <Ionicons 
             name="refresh" 
             size={24} 
-            color={refreshing ? "#d1d5db" : "#8b5cf6"} 
+            color={refreshing ? colors.textTertiary : colors.primary} 
           />
         </TouchableOpacity>
       </View>
 
       {loading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#8b5cf6" />
-          <Text style={styles.loadingText}>Loading tickets...</Text>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>Loading tickets...</Text>
         </View>
       ) : error ? (
         <ErrorState />
@@ -293,11 +297,11 @@ const HelpdeskScreen = ({ navigation }) => {
 
       {/* Create Button */}
       <TouchableOpacity
-        style={styles.createButton}
+        style={[styles.createButton, { backgroundColor: colors.primary }]}
         onPress={handleCreateTicket}
       >
-        <Ionicons name="add" size={28} color="#fff" />
-        <Text style={styles.createButtonText}>Create Ticket</Text>
+        <Ionicons name="add" size={28} color={colors.onPrimary} />
+        <Text style={[styles.createButtonText, { color: colors.onPrimary }]}>Create Ticket</Text>
       </TouchableOpacity>
 
       {/* Create Form Modal */}
@@ -321,7 +325,6 @@ const HelpdeskScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f3e8ff',
   },
   header: {
     flexDirection: 'row',
@@ -329,9 +332,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 15,
-    backgroundColor: '#ffffff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
   },
   backButton: {
     padding: 8,
@@ -339,7 +340,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#8b5cf6',
   },
   refreshButton: {
     padding: 8,
@@ -353,7 +353,6 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#6b7280',
   },
   scrollContainer: {
     flex: 1,
@@ -363,7 +362,6 @@ const styles = StyleSheet.create({
     paddingBottom: 100, // Space for create button
   },
   ticketCard: {
-    backgroundColor: '#ffffff',
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
@@ -376,7 +374,6 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
     borderWidth: 1,
-    borderColor: '#f1f5f9',
   },
   ticketHeader: {
     flexDirection: 'row',
@@ -391,7 +388,6 @@ const styles = StyleSheet.create({
   ticketId: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#8b5cf6',
     marginRight: 12,
   },
   dateContainer: {
@@ -411,12 +407,10 @@ const styles = StyleSheet.create({
   },
   ticketDate: {
     fontSize: 12,
-    color: '#6b7280',
     marginLeft: 4,
   },
   ticketDescription: {
     fontSize: 15,
-    color: '#374151',
     lineHeight: 22,
     marginBottom: 16,
     marginTop: 8,
@@ -439,7 +433,6 @@ const styles = StyleSheet.create({
   scheduleContainer: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: '#f8fafc',
     padding: 12,
     borderRadius: 8,
     marginBottom: 12,
@@ -451,19 +444,16 @@ const styles = StyleSheet.create({
   scheduleLabel: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#8b5cf6',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   scheduleText: {
     fontSize: 13,
-    color: '#374151',
     marginTop: 2,
   },
   attachmentContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ecfdf5',
     padding: 8,
     borderRadius: 6,
     marginBottom: 12,
@@ -471,7 +461,6 @@ const styles = StyleSheet.create({
   },
   attachmentText: {
     fontSize: 12,
-    color: '#059669',
     fontWeight: '500',
   },
   ticketMeta: {
@@ -481,7 +470,6 @@ const styles = StyleSheet.create({
   },
   ticketMetaText: {
     fontSize: 11,
-    color: '#9ca3af',
     fontWeight: '500',
   },
   emptyState: {
@@ -494,13 +482,11 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1f2937',
     marginTop: 16,
     marginBottom: 8,
   },
   emptyStateText: {
     fontSize: 16,
-    color: '#6b7280',
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -514,19 +500,16 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#dc2626',
     marginTop: 16,
     marginBottom: 8,
   },
   errorText: {
     fontSize: 16,
-    color: '#6b7280',
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: '#8b5cf6',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
@@ -534,14 +517,12 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: 16,
     fontWeight: '500',
-    color: '#ffffff',
   },
   createButton: {
     position: 'absolute',
     bottom: 32,
     right: 16,
     left: 16,
-    backgroundColor: '#8b5cf6',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -560,7 +541,6 @@ const styles = StyleSheet.create({
   createButtonText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#ffffff',
     marginLeft: 8,
   },
 });

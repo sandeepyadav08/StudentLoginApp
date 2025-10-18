@@ -20,7 +20,8 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getDashboardData } from "../services/dashboardApi";
-import { logoutAPI } from "../services/api";
+import { logoutAPI, readUserAPI } from "../services/api";
+import { useTheme } from "../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
 
@@ -39,6 +40,7 @@ const getResponsivePadding = (basePadding, screenWidth) => {
 export default function DashboardScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
+  const { colors, isDark, resetThemeToLight } = useTheme();
 
   const [dashboardData, setDashboardData] = useState({
     grievance: 0,
@@ -46,6 +48,7 @@ export default function DashboardScreen({ navigation }) {
     utility: 0,
     subscriptions: {},
   });
+  const [userName, setUserName] = useState("Student");
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -53,17 +56,34 @@ export default function DashboardScreen({ navigation }) {
   const [drawerAnimation] = useState(new Animated.Value(-width * 0.8));
   const [isDrawerAnimating, setIsDrawerAnimating] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
+  const [utilitySubmenuOpen, setUtilitySubmenuOpen] = useState(false);
   const isMounted = useRef(true);
 
   useEffect(() => {
     isMounted.current = true;
     loadDashboardData();
+    loadUserData();
 
     // Cleanup function
     return () => {
       isMounted.current = false;
     };
   }, []);
+
+  const loadUserData = async () => {
+    try {
+      const token = await AsyncStorage.getItem("userToken");
+      if (token) {
+        const userData = await readUserAPI(token);
+        if (userData.success && userData.user?.name) {
+          setUserName(userData.user.name);
+        }
+      }
+    } catch (error) {
+      console.error("User data load error:", error);
+      // Keep default "Student" if API fails
+    }
+  };
 
   const loadDashboardData = async () => {
     try {
@@ -87,7 +107,7 @@ export default function DashboardScreen({ navigation }) {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await loadDashboardData();
+    await Promise.all([loadDashboardData(), loadUserData()]);
     setRefreshing(false);
   };
 
@@ -107,6 +127,7 @@ export default function DashboardScreen({ navigation }) {
         if (isMounted.current) {
           setDrawerVisible(false);
           setIsDrawerAnimating(false);
+          setUtilitySubmenuOpen(false); // Reset submenu state when drawer closes
         }
       });
     } else {
@@ -128,6 +149,12 @@ export default function DashboardScreen({ navigation }) {
     // Prevent multiple rapid calls
     if (isDrawerAnimating) return;
 
+    // Handle Utility submenu toggle
+    if (item === "Utility") {
+      setUtilitySubmenuOpen(!utilitySubmenuOpen);
+      return;
+    }
+
     // Close drawer first, then navigate after animation completes
     if (drawerVisible) {
       setIsDrawerAnimating(true);
@@ -139,6 +166,7 @@ export default function DashboardScreen({ navigation }) {
         if (isMounted.current) {
           setDrawerVisible(false);
           setIsDrawerAnimating(false);
+          setUtilitySubmenuOpen(false); // Reset submenu state
 
           // Navigate after drawer is closed
           setTimeout(() => {
@@ -147,8 +175,14 @@ export default function DashboardScreen({ navigation }) {
                 navigation.navigate("Helpdesk");
               } else if (item === "Grievance") {
                 navigation.navigate("Grievance");
-              } else if (item === "Utility") {
-                navigation.navigate("UtilityForm");
+              } else if (item === "SubscribeMembership") {
+                navigation.navigate("SubscribeMembership");
+              } else if (item === "CoursePlacement") {
+                navigation.navigate("CoursePlacement");
+              } else if (item === "HostelIdFee") {
+                navigation.navigate("HostelIdFee");
+              } else if (item === "Settings") {
+                navigation.navigate("Settings");
               } else {
                 Alert.alert("Navigation", `Navigate to ${item}`);
               }
@@ -202,41 +236,65 @@ export default function DashboardScreen({ navigation }) {
     }, 1000);
   };
 
-  const StatCard = ({ title, count, color, icon }) => (
-    <View
-      style={[
-        styles.statCard,
-        {
-          backgroundColor: color.bg,
-          padding: getResponsivePadding(16, screenWidth),
-        },
-      ]}
-    >
-      <View style={styles.statIcon}>
-        <Ionicons
-          name={icon}
-          size={screenWidth < 350 ? 20 : 24}
-          color={color.icon}
-        />
+  const StatCard = ({ title, count, color, icon }) => {
+    // Create theme-aware background colors
+    const bgColor = isDark 
+      ? `${color.icon}15` // 15 is hex for ~8% opacity
+      : color.bg;
+      
+    return (
+      <View
+        style={[
+          styles.statCard,
+          {
+            backgroundColor: bgColor,
+            padding: getResponsivePadding(16, screenWidth),
+            // Add subtle border in dark mode for better definition
+            ...(isDark && {
+              borderWidth: 1,
+              borderColor: `${color.icon}30`, // 30 is hex for ~19% opacity
+            }),
+          },
+        ]}
+      >
+        <View style={styles.statIcon}>
+          <Ionicons
+            name={icon}
+            size={screenWidth < 350 ? 20 : 24}
+            color={color.icon}
+          />
+        </View>
+        <Text
+          style={[
+            styles.statCount,
+            { 
+              color: colors.text,
+              fontSize: getResponsiveSize(28, screenWidth),
+              // Add text shadow in dark mode for better visibility
+              ...(isDark && {
+                textShadowColor: 'rgba(0, 0, 0, 0.5)',
+                textShadowOffset: { width: 1, height: 1 },
+                textShadowRadius: 2,
+              }),
+            },
+          ]}
+        >
+          {count}
+        </Text>
+        <Text
+          style={[
+            styles.statTitle,
+            { 
+              color: colors.textSecondary,
+              fontSize: getResponsiveSize(12, screenWidth) 
+            },
+          ]}
+        >
+          {title}
+        </Text>
       </View>
-      <Text
-        style={[
-          styles.statCount,
-          { fontSize: getResponsiveSize(28, screenWidth) },
-        ]}
-      >
-        {count}
-      </Text>
-      <Text
-        style={[
-          styles.statTitle,
-          { fontSize: getResponsiveSize(12, screenWidth) },
-        ]}
-      >
-        {title}
-      </Text>
-    </View>
-  );
+    );
+  };
 
   const SubscriptionItem = ({ subscription }) => {
     const isActive = subscription.status === "active";
@@ -251,7 +309,7 @@ export default function DashboardScreen({ navigation }) {
     }
 
     return (
-      <View style={styles.subscriptionItem}>
+      <View style={[styles.subscriptionItem, { borderBottomColor: colors.borderLight }]}>
         <View style={styles.subscriptionLeft}>
           <View
             style={[
@@ -263,7 +321,10 @@ export default function DashboardScreen({ navigation }) {
             <Text
               style={[
                 styles.subscriptionTitle,
-                { fontSize: getResponsiveSize(16, screenWidth) },
+                { 
+                  color: colors.text,
+                  fontSize: getResponsiveSize(16, screenWidth) 
+                },
               ]}
             >
               {subscription.name || "Unknown Utility"}
@@ -272,7 +333,10 @@ export default function DashboardScreen({ navigation }) {
               <Text
                 style={[
                   styles.subscriptionAmount,
-                  { fontSize: getResponsiveSize(12, screenWidth) },
+                  { 
+                    color: colors.success,
+                    fontSize: getResponsiveSize(12, screenWidth) 
+                  },
                 ]}
               >
                 ₹{subscription.amount}
@@ -284,7 +348,10 @@ export default function DashboardScreen({ navigation }) {
           <Text
             style={[
               styles.subscriptionEndDate,
-              { fontSize: getResponsiveSize(14, screenWidth) },
+              { 
+                color: colors.textSecondary,
+                fontSize: getResponsiveSize(14, screenWidth) 
+              },
             ]}
           >
             End: {subscription.endDate}
@@ -314,14 +381,16 @@ export default function DashboardScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
-      <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Header */}
         <View
           style={[
             styles.header,
             {
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
               paddingHorizontal: getResponsivePadding(16, screenWidth),
               paddingVertical: getResponsivePadding(15, screenWidth),
             },
@@ -333,18 +402,21 @@ export default function DashboardScreen({ navigation }) {
             disabled={isDrawerAnimating}
             activeOpacity={0.7}
           >
-            <Ionicons name="menu" size={24} color="#7c3aed" />
+            <Ionicons name="menu" size={24} color={colors.primary} />
           </TouchableOpacity>
           <Text
             style={[
               styles.headerTitle,
-              { fontSize: getResponsiveSize(18, screenWidth) },
+              { 
+                color: colors.primary,
+                fontSize: getResponsiveSize(18, screenWidth) 
+              },
             ]}
           >
             Student Portal
           </Text>
           <TouchableOpacity style={styles.notificationButton}>
-            <Ionicons name="notifications-outline" size={24} color="#7c3aed" />
+            <Ionicons name="notifications-outline" size={24} color={colors.primary} />
           </TouchableOpacity>
         </View>
 
@@ -359,6 +431,7 @@ export default function DashboardScreen({ navigation }) {
             style={[
               styles.welcomeSection,
               {
+                backgroundColor: colors.primary,
                 margin: getResponsivePadding(16, screenWidth),
                 padding: getResponsivePadding(20, screenWidth),
               },
@@ -367,15 +440,21 @@ export default function DashboardScreen({ navigation }) {
             <Text
               style={[
                 styles.welcomeTitle,
-                { fontSize: getResponsiveSize(24, screenWidth) },
+                { 
+                  color: colors.onPrimary,
+                  fontSize: getResponsiveSize(24, screenWidth) 
+                },
               ]}
             >
-              Welcome, Student!
+              Welcome, {userName}
             </Text>
             <Text
               style={[
                 styles.welcomeSubtitle,
-                { fontSize: getResponsiveSize(14, screenWidth) },
+                { 
+                  color: colors.primaryContainer,
+                  fontSize: getResponsiveSize(14, screenWidth) 
+                },
               ]}
             >
               Manage your college activities efficiently
@@ -386,7 +465,10 @@ export default function DashboardScreen({ navigation }) {
                 <Text
                   style={[
                     styles.errorText,
-                    { fontSize: getResponsiveSize(12, screenWidth) },
+                    { 
+                      color: colors.error,
+                      fontSize: getResponsiveSize(12, screenWidth) 
+                    },
                   ]}
                 >
                   {error}
@@ -439,6 +521,7 @@ export default function DashboardScreen({ navigation }) {
             style={[
               styles.subscriptionSection,
               {
+                backgroundColor: colors.surface,
                 marginHorizontal: getResponsivePadding(16, screenWidth),
                 padding: getResponsivePadding(20, screenWidth),
               },
@@ -446,22 +529,26 @@ export default function DashboardScreen({ navigation }) {
           >
             <View style={styles.sectionHeader}>
               <Text
-                style={[
-                  styles.sectionTitle,
-                  { fontSize: getResponsiveSize(18, screenWidth) },
-                ]}
+                  style={[
+                    styles.sectionTitle,
+                    { 
+                      color: colors.primary,
+                      fontSize: getResponsiveSize(18, screenWidth) 
+                    },
+                  ]}
               >
                 Subscription Utilities
               </Text>
               <TouchableOpacity onPress={onRefresh} disabled={refreshing}>
                 <Text
-                  style={[
-                    styles.refreshButton,
-                    {
-                      fontSize: getResponsiveSize(14, screenWidth),
-                      opacity: refreshing ? 0.5 : 1,
-                    },
-                  ]}
+                    style={[
+                      styles.refreshButton,
+                      {
+                        color: colors.primary,
+                        fontSize: getResponsiveSize(14, screenWidth),
+                        opacity: refreshing ? 0.5 : 1,
+                      },
+                    ]}
                 >
                   {refreshing ? "Refreshing..." : "Refresh All"}
                 </Text>
@@ -473,7 +560,10 @@ export default function DashboardScreen({ navigation }) {
                 <Text
                   style={[
                     styles.loadingText,
-                    { fontSize: getResponsiveSize(14, screenWidth) },
+                    { 
+                      color: colors.textSecondary,
+                      fontSize: getResponsiveSize(14, screenWidth) 
+                    },
                   ]}
                 >
                   Loading subscriptions...
@@ -492,7 +582,10 @@ export default function DashboardScreen({ navigation }) {
                     <Text
                       style={[
                         styles.noSubscriptionsText,
-                        { fontSize: getResponsiveSize(14, screenWidth) },
+                        { 
+                          color: colors.textSecondary,
+                          fontSize: getResponsiveSize(14, screenWidth) 
+                        },
                       ]}
                     >
                       {error
@@ -510,17 +603,24 @@ export default function DashboardScreen({ navigation }) {
         <View
           style={[
             styles.bottomNavigation,
-            { paddingBottom: Math.max(insets.bottom, 12) },
+            { 
+              backgroundColor: colors.surface,
+              borderTopColor: colors.border,
+              paddingBottom: Math.max(insets.bottom, 12) 
+            },
           ]}
         >
           <TouchableOpacity style={styles.navItem}>
             <Ionicons
               name="home"
               size={screenWidth < 350 ? 20 : 24}
-              color="#7c3aed"
+              color={colors.primary}
             />
             <Text
-              style={[styles.navText, { fontSize: screenWidth < 350 ? 9 : 10 }]}
+              style={[styles.navText, { 
+                color: colors.primary,
+                fontSize: screenWidth < 350 ? 9 : 10 
+              }]}
             >
               Home
             </Text>
@@ -532,17 +632,17 @@ export default function DashboardScreen({ navigation }) {
             activeOpacity={0.7}
           >
             <Ionicons
-              name="bar-chart-outline"
+              name="receipt-outline"
               size={screenWidth < 350 ? 20 : 24}
-              color="#9ca3af"
+              color={colors.textTertiary}
             />
             <Text
               style={[
-                styles.navText,
-                { color: "#9ca3af", fontSize: screenWidth < 350 ? 9 : 10 },
+              styles.navText,
+                { color: colors.textTertiary, fontSize: screenWidth < 350 ? 9 : 10 },
               ]}
             >
-              Data
+              Payment
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -554,12 +654,12 @@ export default function DashboardScreen({ navigation }) {
             <Ionicons
               name="log-out-outline"
               size={screenWidth < 350 ? 20 : 24}
-              color="#9ca3af"
+              color={colors.textTertiary}
             />
             <Text
               style={[
                 styles.navText,
-                { color: "#9ca3af", fontSize: screenWidth < 350 ? 9 : 10 },
+                { color: colors.textTertiary, fontSize: screenWidth < 350 ? 9 : 10 },
               ]}
             >
               Logout
@@ -575,7 +675,7 @@ export default function DashboardScreen({ navigation }) {
           onRequestClose={toggleDrawer}
         >
           <TouchableOpacity
-            style={styles.drawerOverlay}
+            style={[styles.drawerOverlay, { backgroundColor: colors.overlay }]}
             activeOpacity={1}
             onPress={toggleDrawer}
             disabled={isDrawerAnimating}
@@ -584,19 +684,20 @@ export default function DashboardScreen({ navigation }) {
               style={[
                 styles.drawer,
                 {
+                  backgroundColor: colors.surface,
                   transform: [{ translateX: drawerAnimation }],
                 },
               ]}
             >
               <TouchableOpacity activeOpacity={1}>
-                <View style={styles.drawerHeader}>
-                  <Text style={styles.drawerTitle}>Menu</Text>
+                <View style={[styles.drawerHeader, { borderBottomColor: colors.border }]}>
+                  <Text style={[styles.drawerTitle, { color: colors.primary }]}>Menu</Text>
                   <TouchableOpacity
                     onPress={toggleDrawer}
                     disabled={isDrawerAnimating}
                     activeOpacity={0.7}
                   >
-                    <Ionicons name="close" size={24} color="#7c3aed" />
+                    <Ionicons name="close" size={24} color={colors.primary} />
                   </TouchableOpacity>
                 </View>
 
@@ -610,9 +711,9 @@ export default function DashboardScreen({ navigation }) {
                     <Ionicons
                       name="help-circle-outline"
                       size={24}
-                      color="#7c3aed"
+                      color={colors.primary}
                     />
-                    <Text style={styles.drawerItemText}>Helpdesk</Text>
+                    <Text style={[styles.drawerItemText, { color: colors.text }]}>Helpdesk</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -624,11 +725,12 @@ export default function DashboardScreen({ navigation }) {
                     <Ionicons
                       name="alert-circle-outline"
                       size={24}
-                      color="#7c3aed"
+                      color={colors.primary}
                     />
-                    <Text style={styles.drawerItemText}>Grievance</Text>
+                    <Text style={[styles.drawerItemText, { color: colors.text }]}>Grievance</Text>
                   </TouchableOpacity>
 
+                  {/* Utility with submenu */}
                   <TouchableOpacity
                     style={styles.drawerItem}
                     onPress={() => handleDrawerItemPress("Utility")}
@@ -638,9 +740,82 @@ export default function DashboardScreen({ navigation }) {
                     <Ionicons
                       name="construct-outline"
                       size={24}
-                      color="#7c3aed"
+                      color={colors.primary}
                     />
-                    <Text style={styles.drawerItemText}>Utility</Text>
+                    <Text style={[styles.drawerItemText, { color: colors.text }]}>Utility</Text>
+                    <Ionicons
+                      name={utilitySubmenuOpen ? "chevron-up" : "chevron-down"}
+                      size={20}
+                      color={colors.textSecondary}
+                      style={styles.submenuIcon}
+                    />
+                  </TouchableOpacity>
+
+                  {/* Utility Submenu */}
+                  {utilitySubmenuOpen && (
+                    <View style={styles.submenuContainer}>
+                      <TouchableOpacity
+                        style={styles.submenuItem}
+                        onPress={() => handleDrawerItemPress("SubscribeMembership")}
+                        disabled={isDrawerAnimating}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name="card-outline"
+                          size={20}
+                          color={colors.textSecondary}
+                        />
+                        <Text style={[styles.submenuItemText, { color: colors.textSecondary }]}>
+                          Subscribe Membership
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.submenuItem}
+                        onPress={() => handleDrawerItemPress("CoursePlacement")}
+                        disabled={isDrawerAnimating}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name="school-outline"
+                          size={20}
+                          color={colors.textSecondary}
+                        />
+                        <Text style={[styles.submenuItemText, { color: colors.textSecondary }]}>
+                          Course & Placement
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.submenuItem}
+                        onPress={() => handleDrawerItemPress("HostelIdFee")}
+                        disabled={isDrawerAnimating}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons
+                          name="business-outline"
+                          size={20}
+                          color={colors.textSecondary}
+                        />
+                        <Text style={[styles.submenuItemText, { color: colors.textSecondary }]}>
+                          Hostel & ID Fee
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  <TouchableOpacity
+                    style={styles.drawerItem}
+                    onPress={() => handleDrawerItemPress("Settings")}
+                    disabled={isDrawerAnimating}
+                    activeOpacity={0.7}
+                  >
+                    <Ionicons
+                      name="settings-outline"
+                      size={24}
+                      color={colors.primary}
+                    />
+                    <Text style={[styles.drawerItemText, { color: colors.text }]}>Settings</Text>
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
@@ -655,11 +830,9 @@ export default function DashboardScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#f3e8ff",
   },
   container: {
     flex: 1,
-    backgroundColor: "#f3e8ff",
   },
   header: {
     flexDirection: "row",
@@ -667,10 +840,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 15,
-    backgroundColor: "#ffffff",
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-    marginTop: Platform.OS === "android" ? 0 : 0, // Additional margin if needed
+    marginTop: Platform.OS === "android" ? 0 : 0,
   },
   menuButton: {
     padding: 8,
@@ -678,17 +849,14 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#7c3aed",
   },
   notificationButton: {
     padding: 8,
   },
   scrollContainer: {
     flex: 1,
-    backgroundColor: "#f3e8ff",
   },
   welcomeSection: {
-    backgroundColor: "#7c3aed",
     margin: 16,
     padding: 20,
     borderRadius: 16,
@@ -696,12 +864,10 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#ffffff",
     marginBottom: 4,
   },
   welcomeSubtitle: {
     fontSize: 14,
-    color: "#e0e7ff",
   },
   statsContainer: {
     flexDirection: "row",
@@ -721,17 +887,14 @@ const styles = StyleSheet.create({
   statCount: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#1f2937",
     marginBottom: 4,
   },
   statTitle: {
     fontSize: 12,
-    color: "#6b7280",
     textAlign: "center",
   },
   subscriptionSection: {
     marginHorizontal: 16,
-    backgroundColor: "#ffffff",
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
@@ -745,11 +908,9 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#7c3aed",
   },
   refreshButton: {
     fontSize: 14,
-    color: "#7c3aed",
     fontWeight: "500",
   },
   subscriptionContainer: {
@@ -761,7 +922,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
   },
   subscriptionLeft: {
     flexDirection: "row",
@@ -770,25 +930,21 @@ const styles = StyleSheet.create({
   subscriptionIndicator: {
     width: 12,
     height: 12,
-    backgroundColor: "#16a34a",
     borderRadius: 6,
     marginRight: 12,
   },
   subscriptionTitle: {
     fontSize: 16,
     fontWeight: "500",
-    color: "#1f2937",
   },
   subscriptionRight: {
     alignItems: "flex-end",
   },
   subscriptionEndDate: {
     fontSize: 14,
-    color: "#6b7280",
   },
   subscriptionAmount: {
     fontSize: 12,
-    color: "#16a34a",
     fontWeight: "600",
     marginTop: 2,
   },
@@ -803,7 +959,6 @@ const styles = StyleSheet.create({
   },
   noSubscriptionsText: {
     fontSize: 14,
-    color: "#6b7280",
     fontStyle: "italic",
   },
   errorContainer: {
@@ -817,7 +972,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 12,
-    color: "#dc2626",
     marginLeft: 6,
     flex: 1,
   },
@@ -827,16 +981,13 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: 14,
-    color: "#6b7280",
     fontStyle: "italic",
   },
   bottomNavigation: {
     flexDirection: "row",
-    backgroundColor: "#ffffff",
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderTopWidth: 1,
-    borderTopColor: "#e5e7eb",
     paddingBottom: Platform.OS === "android" ? 12 : 12,
   },
   navItem: {
@@ -847,18 +998,15 @@ const styles = StyleSheet.create({
   navText: {
     fontSize: 10,
     marginTop: 4,
-    color: "#7c3aed",
     fontWeight: "500",
   },
   drawerOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
   },
   drawer: {
     width: width * 0.8,
     height: "100%",
-    backgroundColor: "#ffffff",
-    paddingTop: 20, // Increased padding to avoid notification bar
+    paddingTop: 20,
   },
   drawerHeader: {
     flexDirection: "row",
@@ -867,12 +1015,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 20,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
   },
   drawerTitle: {
     fontSize: 20,
     fontWeight: "600",
-    color: "#7c3aed",
   },
   drawerContent: {
     paddingTop: 20,
@@ -886,6 +1032,23 @@ const styles = StyleSheet.create({
   drawerItemText: {
     fontSize: 16,
     marginLeft: 16,
-    color: "#1f2937",
+    flex: 1,
+  },
+  submenuIcon: {
+    marginLeft: 'auto',
+  },
+  submenuContainer: {
+    paddingLeft: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+  },
+  submenuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+  },
+  submenuItemText: {
+    fontSize: 14,
+    marginLeft: 12,
   },
 });

@@ -21,6 +21,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Picker } from "@react-native-picker/picker";
 import { getPaymentHistoryAPI, getPaymentDetailsAPI } from "../services/api";
 import { WebView } from "react-native-webview";
+import { useTheme } from "../contexts/ThemeContext";
 
 // Responsive utility functions
 const getResponsiveSize = (baseSize, screenWidth) => {
@@ -37,6 +38,7 @@ const getResponsivePadding = (basePadding, screenWidth) => {
 export default function PaymentHistoryScreen({ navigation }) {
   const insets = useSafeAreaInsets();
   const { width: screenWidth } = Dimensions.get("window");
+  const { colors, isDark } = useTheme();
 
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +47,7 @@ export default function PaymentHistoryScreen({ navigation }) {
   const [error, setError] = useState(null);
   const [statusFilter, setStatusFilter] = useState("");
   const [hasMore, setHasMore] = useState(true);
+  const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
 
   // Modal states
@@ -268,6 +271,7 @@ export default function PaymentHistoryScreen({ navigation }) {
       style={[
         styles.paymentItem,
         {
+          backgroundColor: colors.surface,
           marginHorizontal: getResponsivePadding(16, screenWidth),
           marginBottom: getResponsivePadding(12, screenWidth),
           padding: getResponsivePadding(16, screenWidth),
@@ -281,7 +285,10 @@ export default function PaymentHistoryScreen({ navigation }) {
           <Text
             style={[
               styles.paymentId,
-              { fontSize: getResponsiveSize(14, screenWidth) },
+              { 
+                color: colors.text,
+                fontSize: getResponsiveSize(14, screenWidth) 
+              },
             ]}
           >
             #{item.id || item.transaction_id || `PAY-${index + 1}`}
@@ -289,7 +296,10 @@ export default function PaymentHistoryScreen({ navigation }) {
           <Text
             style={[
               styles.paymentDate,
-              { fontSize: getResponsiveSize(12, screenWidth) },
+              { 
+                color: colors.textSecondary,
+                fontSize: getResponsiveSize(12, screenWidth) 
+              },
             ]}
           >
             {formatDate(item.date || item.payment_date || item.created_at)}
@@ -298,7 +308,10 @@ export default function PaymentHistoryScreen({ navigation }) {
         <Text
           style={[
             styles.paymentAmount,
-            { fontSize: getResponsiveSize(16, screenWidth) },
+            { 
+              color: colors.primary,
+              fontSize: getResponsiveSize(16, screenWidth) 
+            },
           ]}
         >
           {formatAmount(item.amount || item.payment_amount || 0)}
@@ -309,7 +322,10 @@ export default function PaymentHistoryScreen({ navigation }) {
         <Text
           style={[
             styles.paymentDescription,
-            { fontSize: getResponsiveSize(14, screenWidth) },
+            { 
+              color: colors.text,
+              fontSize: getResponsiveSize(14, screenWidth) 
+            },
           ]}
         >
           {item.for_payment || item.payment_description || item.purpose || "NA"}
@@ -473,13 +489,15 @@ export default function PaymentHistoryScreen({ navigation }) {
 
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar style="dark" />
-        <View style={styles.container}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+        <StatusBar style={isDark ? "light" : "dark"} />
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
           <View
             style={[
               styles.header,
               {
+                backgroundColor: colors.surface,
+                borderBottomColor: colors.border,
                 paddingHorizontal: getResponsivePadding(16, screenWidth),
                 paddingVertical: getResponsivePadding(15, screenWidth),
               },
@@ -489,12 +507,15 @@ export default function PaymentHistoryScreen({ navigation }) {
               style={styles.backButton}
               onPress={() => navigation.goBack()}
             >
-              <Ionicons name="arrow-back" size={24} color="#7c3aed" />
+              <Ionicons name="arrow-back" size={24} color={colors.primary} />
             </TouchableOpacity>
             <Text
               style={[
                 styles.headerTitle,
-                { fontSize: getResponsiveSize(18, screenWidth) },
+                { 
+                  color: colors.primary,
+                  fontSize: getResponsiveSize(18, screenWidth) 
+                },
               ]}
             >
               Payment History
@@ -503,11 +524,14 @@ export default function PaymentHistoryScreen({ navigation }) {
           </View>
 
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#7c3aed" />
+            <ActivityIndicator size="large" color={colors.primary} />
             <Text
               style={[
                 styles.loadingText,
-                { fontSize: getResponsiveSize(16, screenWidth) },
+                { 
+                  color: colors.textSecondary,
+                  fontSize: getResponsiveSize(16, screenWidth) 
+                },
               ]}
             >
               Loading payment history...
@@ -519,14 +543,16 @@ export default function PaymentHistoryScreen({ navigation }) {
   }
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="dark" />
-      <View style={styles.container}>
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Header */}
         <View
           style={[
             styles.header,
             {
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
               paddingHorizontal: getResponsivePadding(16, screenWidth),
               paddingVertical: getResponsivePadding(15, screenWidth),
             },
@@ -536,12 +562,15 @@ export default function PaymentHistoryScreen({ navigation }) {
             style={styles.backButton}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={24} color="#7c3aed" />
+            <Ionicons name="arrow-back" size={24} color={colors.primary} />
           </TouchableOpacity>
           <Text
             style={[
               styles.headerTitle,
-              { fontSize: getResponsiveSize(18, screenWidth) },
+              { 
+                color: colors.primary,
+                fontSize: getResponsiveSize(18, screenWidth) 
+              },
             ]}
           >
             Payment History
@@ -550,29 +579,104 @@ export default function PaymentHistoryScreen({ navigation }) {
             style={styles.refreshHeaderButton}
             onPress={onRefresh}
           >
-            <Ionicons name="refresh" size={24} color="#7c3aed" />
+            <Ionicons name="refresh" size={24} color={colors.primary} />
           </TouchableOpacity>
         </View>
 
-        {/* Filter Dropdown */}
+        {/* Custom Filter Dropdown */}
         <View
           style={{
             paddingHorizontal: 16,
             paddingVertical: 10,
-            backgroundColor: "#fff",
+            backgroundColor: colors.surface,
+            borderBottomWidth: 1,
+            borderBottomColor: colors.border,
+            zIndex: 1000,
           }}
         >
-          <Picker
-            selectedValue={statusFilter}
-            onValueChange={(value) => setStatusFilter(value)}
-            style={{ backgroundColor: "#fff", borderRadius: 8 }}
+          <TouchableOpacity
+            style={{
+              flexDirection: 'row',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              paddingHorizontal: 12,
+              paddingVertical: 12,
+              backgroundColor: colors.surface,
+              borderWidth: 1,
+              borderColor: colors.border,
+              borderRadius: 8,
+            }}
+            onPress={() => setShowFilterDropdown(!showFilterDropdown)}
           >
-            <Picker.Item label="All" value="" />
-            <Picker.Item label="Pending" value="0" />
-            <Picker.Item label="Success" value="1" />
-            <Picker.Item label="Fail" value="2" />
-            <Picker.Item label="Processing" value="3" />
-          </Picker>
+            <Text style={{ color: colors.text, fontSize: 16 }}>
+              {statusFilter === "" ? "All" : 
+               statusFilter === "0" ? "Pending" :
+               statusFilter === "1" ? "Success" :
+               statusFilter === "2" ? "Fail" :
+               statusFilter === "3" ? "Processing" : "All"}
+            </Text>
+            <Ionicons 
+              name={showFilterDropdown ? "chevron-up" : "chevron-down"} 
+              size={20} 
+              color={colors.textSecondary} 
+            />
+          </TouchableOpacity>
+          
+          {showFilterDropdown && (
+            <View
+              style={{
+                position: 'absolute',
+                top: '100%',
+                left: 16,
+                right: 16,
+                backgroundColor: colors.surface,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderTopWidth: 0,
+                borderBottomLeftRadius: 8,
+                borderBottomRightRadius: 8,
+                elevation: 5,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                zIndex: 1001,
+              }}
+            >
+              {[
+                { label: "All", value: "" },
+                { label: "Pending", value: "0" },
+                { label: "Success", value: "1" },
+                { label: "Fail", value: "2" },
+                { label: "Processing", value: "3" },
+              ].map((item, index, array) => (
+                <TouchableOpacity
+                  key={item.value}
+                  style={{
+                    paddingHorizontal: 12,
+                    paddingVertical: 12,
+                    borderBottomWidth: index < array.length - 1 ? 1 : 0,
+                    borderBottomColor: colors.border,
+                    backgroundColor: statusFilter === item.value ? colors.primaryContainer : 'transparent',
+                  }}
+                  onPress={() => {
+                    setStatusFilter(item.value);
+                    setShowFilterDropdown(false);
+                  }}
+                >
+                  <Text 
+                    style={{ 
+                      color: statusFilter === item.value ? colors.primary : colors.text,
+                      fontSize: 16,
+                      fontWeight: statusFilter === item.value ? '600' : '400',
+                    }}
+                  >
+                    {item.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
         </View>
 
         {/* Content */}
@@ -591,7 +695,7 @@ export default function PaymentHistoryScreen({ navigation }) {
             ListFooterComponent={() =>
               loadingMore ? (
                 <View style={styles.loadingMoreContainer}>
-                  <ActivityIndicator size="small" color="#7c3aed" />
+                <ActivityIndicator size="small" color={colors.primary} />
                   <Text style={styles.loadingMoreText}>Loading more...</Text>
                 </View>
               ) : null
@@ -625,19 +729,15 @@ export default function PaymentHistoryScreen({ navigation }) {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#f3e8ff",
   },
   container: {
     flex: 1,
-    backgroundColor: "#f3e8ff",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#ffffff",
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
     paddingHorizontal: 16,
     paddingVertical: 15,
   },
@@ -647,7 +747,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#7c3aed",
   },
   refreshHeaderButton: {
     padding: 8,
@@ -663,14 +762,12 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 12,
     fontSize: 16,
-    color: "#6b7280",
   },
   listContainer: {
     paddingTop: 16,
     paddingBottom: 20,
   },
   paymentItem: {
-    backgroundColor: "#ffffff",
     borderRadius: 12,
     marginHorizontal: 16,
     marginBottom: 12,
@@ -694,17 +791,14 @@ const styles = StyleSheet.create({
   paymentId: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#1f2937",
     marginBottom: 2,
   },
   paymentDate: {
     fontSize: 12,
-    color: "#6b7280",
   },
   paymentAmount: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#7c3aed",
   },
   paymentDetails: {
     flexDirection: "row",
