@@ -1529,3 +1529,86 @@ export const getHelpdeskTicketsAPI = async (token, page = 0, limit = 10) => {
 //     throw new Error(error.message || "Failed to fetch categories");
 //   }
 // };
+// Get Course & Placement Fee API
+export const getCourseAndPlacementFeeAPI = async (token) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/course-n-placement-fee`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const responseText = await response.text();
+    let data;
+
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse course & placement response:", responseText);
+      throw new Error("Invalid server response: " + responseText.slice(0, 100));
+    }
+
+    console.log("Get Course & Placement Fee Response:", {
+      status: response.status,
+      ok: response.ok,
+      data: data,
+    });
+
+    if (!response.ok || (data.status !== 200 && data.status !== 201)) {
+      throw new Error(data.message || "Failed to fetch course & placement fee data");
+    }
+
+    return {
+      success: true,
+      data: data.res || data.data || data,
+      message: data.message || "Course & placement fee data fetched successfully",
+    };
+  } catch (error) {
+    console.error("Get Course & Placement Fee Error:", error);
+    throw new Error(error.message || "Failed to fetch course & placement fee data");
+  }
+};
+
+// Get Hostel & ID Fee API
+export const getHostelAndIdFeeAPI = async (token) => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/hostel-n-id-fee`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const responseText = await response.text();
+    let data;
+
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error("Failed to parse hostel & id fee response:", responseText);
+      throw new Error("Invalid server response: " + responseText.slice(0, 100));
+    }
+
+    console.log("Get Hostel & ID Fee Response:", {
+      status: response.status,
+      ok: response.ok,
+      data: data,
+    });
+
+    if (!response.ok || (data.status !== 200 && data.status !== 201)) {
+      throw new Error(data.message || "Failed to fetch hostel & id fee data");
+    }
+
+    return {
+      success: true,
+      data: data.res || data.data || data,
+      message: data.message || "Hostel & ID fee data fetched successfully",
+    };
+  } catch (error) {
+    console.error("Get Hostel & ID Fee Error:", error);
+    throw new Error(error.message || "Failed to fetch hostel & id fee data");
+  }
+};
