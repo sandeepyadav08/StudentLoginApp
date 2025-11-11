@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
   Text,
@@ -41,6 +41,37 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [rememberMe, setRememberMe] = useState(false);
+
+  // Load saved email on component mount
+  useEffect(() => {
+    loadSavedCredentials();
+  }, []);
+
+  const loadSavedCredentials = async () => {
+    try {
+      const savedEmail = await AsyncStorage.getItem('rememberedEmail');
+      if (savedEmail) {
+        setEmail(savedEmail);
+        setRememberMe(true);
+      }
+    } catch (error) {
+      console.error('Error loading saved credentials:', error);
+    }
+  };
+
+  const handleRememberMeToggle = async () => {
+    const newRememberMe = !rememberMe;
+    setRememberMe(newRememberMe);
+    
+    // If unchecking remember me, clear saved email
+    if (!newRememberMe) {
+      try {
+        await AsyncStorage.removeItem('rememberedEmail');
+      } catch (error) {
+        console.error('Error clearing saved email:', error);
+      }
+    }
+  };
 
   // Email validation
   const validateEmail = (email) => {
@@ -104,6 +135,13 @@ const handleLogin = async () => {
     await AsyncStorage.setItem('userEmail', email.trim());
     if (response.user) {
       await AsyncStorage.setItem('userData', JSON.stringify(response.user));
+    }
+
+    // Save email if remember me is checked
+    if (rememberMe) {
+      await AsyncStorage.setItem('rememberedEmail', email.trim());
+    } else {
+      await AsyncStorage.removeItem('rememberedEmail');
     }
 
     console.log('User logged in:', response.user);
@@ -226,7 +264,7 @@ const handleLogin = async () => {
           <View style={styles.optionsRow}>
             <TouchableOpacity 
               style={styles.rememberMeContainer}
-              onPress={() => setRememberMe(!rememberMe)}
+              onPress={handleRememberMeToggle}
             >
               <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
                 {rememberMe && <Ionicons name="checkmark" size={16} color="white" />}
