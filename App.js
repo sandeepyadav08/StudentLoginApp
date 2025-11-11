@@ -6,7 +6,7 @@ import {
 } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { StatusBar } from "react-native";
+import { StatusBar, Platform } from "react-native";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import LoginScreen from "./screens/LoginScreen";
 import ForgotPasswordScreen from "./screens/ForgotPasswordScreen";
@@ -33,7 +33,10 @@ function AppNavigator() {
   // Update StatusBar when theme changes
   useEffect(() => {
     StatusBar.setBarStyle(isDark ? "light-content" : "dark-content", true);
-    StatusBar.setBackgroundColor(colors.background, true);
+    // setBackgroundColor is only available on Android
+    if (Platform.OS === 'android') {
+      StatusBar.setBackgroundColor(colors.background, true);
+    }
   }, [isDark, colors.background]);
 
   // Create custom navigation theme
