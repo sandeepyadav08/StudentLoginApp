@@ -30,14 +30,7 @@ const Stack = createStackNavigator();
 function AppNavigator() {
   const { isDark, colors } = useTheme();
 
-  // Update StatusBar when theme changes
-  useEffect(() => {
-    StatusBar.setBarStyle(isDark ? "light-content" : "dark-content", true);
-    // setBackgroundColor is only available on Android
-    if (Platform.OS === 'android') {
-      StatusBar.setBackgroundColor(colors.background, true);
-    }
-  }, [isDark, colors.background]);
+
 
   // Create custom navigation theme
   const navigationTheme = {
@@ -54,8 +47,14 @@ function AppNavigator() {
   };
 
   return (
-    <NavigationContainer theme={navigationTheme}>
-      <Stack.Navigator
+    <>
+      <StatusBar 
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={Platform.OS === 'android' ? colors.background : undefined}
+        translucent={false}
+      />
+      <NavigationContainer theme={navigationTheme}>
+        <Stack.Navigator
         initialRouteName="Login"
         screenOptions={{
           headerShown: false, // Hide header for all screens
@@ -168,6 +167,7 @@ function AppNavigator() {
         />
       </Stack.Navigator>
     </NavigationContainer>
+    </>
   );
 }
 

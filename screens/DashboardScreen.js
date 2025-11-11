@@ -53,7 +53,7 @@ export default function DashboardScreen({ navigation }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
-  const [drawerAnimation] = useState(new Animated.Value(-width * 0.8));
+  const [drawerAnimation] = useState(new Animated.Value(-screenWidth * 0.8));
   const [isDrawerAnimating, setIsDrawerAnimating] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [utilitySubmenuOpen, setUtilitySubmenuOpen] = useState(false);
@@ -120,7 +120,7 @@ export default function DashboardScreen({ navigation }) {
     if (drawerVisible) {
       // Close drawer
       Animated.timing(drawerAnimation, {
-        toValue: -width * 0.8,
+        toValue: -screenWidth * 0.8,
         duration: 300,
         useNativeDriver: true,
       }).start(() => {
@@ -159,7 +159,7 @@ export default function DashboardScreen({ navigation }) {
     if (drawerVisible) {
       setIsDrawerAnimating(true);
       Animated.timing(drawerAnimation, {
-        toValue: -width * 0.8,
+        toValue: -screenWidth * 0.8,
         duration: 300,
         useNativeDriver: true,
       }).start(() => {
@@ -523,7 +523,8 @@ export default function DashboardScreen({ navigation }) {
               {
                 backgroundColor: colors.surface,
                 marginHorizontal: getResponsivePadding(16, screenWidth),
-                padding: getResponsivePadding(20, screenWidth),
+                padding: getResponsivePadding(16, screenWidth),
+                maxHeight: screenHeight * 0.3, // Limit height to 30% of screen
               },
             ]}
           >
@@ -570,7 +571,11 @@ export default function DashboardScreen({ navigation }) {
                 </Text>
               </View>
             ) : (
-              <View style={styles.subscriptionContainer}>
+              <ScrollView 
+                style={styles.subscriptionContainer}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+              >
                 {Object.keys(dashboardData.subscriptions).length > 0 ? (
                   Object.entries(dashboardData.subscriptions).map(
                     ([key, subscription]) => (
@@ -594,7 +599,7 @@ export default function DashboardScreen({ navigation }) {
                     </Text>
                   </View>
                 )}
-              </View>
+              </ScrollView>
             )}
           </View>
         </ScrollView>
@@ -606,20 +611,20 @@ export default function DashboardScreen({ navigation }) {
             { 
               backgroundColor: colors.surface,
               borderTopColor: colors.border,
-              paddingBottom: Math.max(insets.bottom, 12) 
+              paddingBottom: insets.bottom > 0 ? insets.bottom : 8
             },
           ]}
         >
           <TouchableOpacity style={styles.navItem}>
             <Ionicons
               name="home"
-              size={screenWidth < 350 ? 20 : 24}
+              size={getResponsiveSize(22, screenWidth)}
               color={colors.primary}
             />
             <Text
               style={[styles.navText, { 
                 color: colors.primary,
-                fontSize: screenWidth < 350 ? 9 : 10 
+                fontSize: getResponsiveSize(10, screenWidth)
               }]}
             >
               Home
@@ -633,13 +638,16 @@ export default function DashboardScreen({ navigation }) {
           >
             <Ionicons
               name="receipt-outline"
-              size={screenWidth < 350 ? 20 : 24}
+              size={getResponsiveSize(22, screenWidth)}
               color={colors.textTertiary}
             />
             <Text
               style={[
-              styles.navText,
-                { color: colors.textTertiary, fontSize: screenWidth < 350 ? 9 : 10 },
+                styles.navText,
+                { 
+                  color: colors.textTertiary,
+                  fontSize: getResponsiveSize(10, screenWidth)
+                }
               ]}
             >
               Payment
@@ -653,13 +661,16 @@ export default function DashboardScreen({ navigation }) {
           >
             <Ionicons
               name="log-out-outline"
-              size={screenWidth < 350 ? 20 : 24}
+              size={getResponsiveSize(22, screenWidth)}
               color={colors.textTertiary}
             />
             <Text
               style={[
                 styles.navText,
-                { color: colors.textTertiary, fontSize: screenWidth < 350 ? 9 : 10 },
+                { 
+                  color: colors.textTertiary,
+                  fontSize: getResponsiveSize(10, screenWidth)
+                }
               ]}
             >
               Logout
@@ -686,6 +697,9 @@ export default function DashboardScreen({ navigation }) {
                 {
                   backgroundColor: colors.surface,
                   transform: [{ translateX: drawerAnimation }],
+                  paddingTop: insets.top + 20, // Add safe area top padding
+                  height: screenHeight, // Dynamic height based on screen
+                  width: screenWidth * 0.8, // Dynamic width based on screen
                 },
               ]}
             >
@@ -896,14 +910,13 @@ const styles = StyleSheet.create({
   subscriptionSection: {
     marginHorizontal: 16,
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 16,
+    marginBottom: 12,
   },
   sectionTitle: {
     fontSize: 18,
@@ -985,28 +998,24 @@ const styles = StyleSheet.create({
   },
   bottomNavigation: {
     flexDirection: "row",
-    paddingVertical: 12,
+    paddingVertical: 10,
     paddingHorizontal: 16,
     borderTopWidth: 1,
-    paddingBottom: Platform.OS === "android" ? 12 : 12,
   },
   navItem: {
     flex: 1,
     alignItems: "center",
-    paddingVertical: 8,
+    paddingVertical: 6,
   },
   navText: {
-    fontSize: 10,
-    marginTop: 4,
+    marginTop: 3,
     fontWeight: "500",
   },
   drawerOverlay: {
     flex: 1,
   },
   drawer: {
-    width: width * 0.8,
-    height: "100%",
-    paddingTop: 20,
+    // Dynamic width and height are now set inline for better responsiveness
   },
   drawerHeader: {
     flexDirection: "row",

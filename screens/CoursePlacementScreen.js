@@ -493,15 +493,15 @@ export default function CoursePlacementScreen({ navigation }) {
 
         {/* Amount Display - Show when payment type is selected */}
         {isCourseSelected(course.id) && getCoursePaymentType(course.id) && (
-          <View style={styles.amountContainer}>
-            <Text style={styles.amountText}>
+          <View style={[styles.amountContainer, { backgroundColor: isDark ? colors.primaryContainer : "#dbeafe" }]}>
+            <Text style={[styles.amountText, { color: isDark ? colors.onPrimaryContainer : "#1e40af" }]}>
               Amount: {getCourseAmount(course.id)}
             </Text>
           </View>
         )}
 
         {/* Department Details - Always show */}
-        <View style={styles.departmentDetails}>
+        <View style={[styles.departmentDetails, { backgroundColor: isDark ? colors.surfaceVariant : "#f8fafc" }]}>
           <Text style={[styles.departmentTitle, { color: colors.text }]}>
             Department detail:
           </Text>
@@ -603,8 +603,14 @@ export default function CoursePlacementScreen({ navigation }) {
                         key={provider.id}
                         style={[
                           styles.paymentOption,
-                          selectedPaymentOption === provider.value &&
+                          {
+                            backgroundColor: isDark ? colors.surface : "#f9fafb",
+                            borderColor: isDark ? colors.border : "#e5e7eb",
+                          },
+                          selectedPaymentOption === provider.value && [
                             styles.paymentOptionSelected,
+                            { backgroundColor: isDark ? colors.primaryContainer : "#f3f4f6" }
+                          ],
                         ]}
                         onPress={() => setSelectedPaymentOption(provider.value)}
                       >
@@ -658,7 +664,7 @@ export default function CoursePlacementScreen({ navigation }) {
                 )}
 
               {/* Instructions */}
-              <View style={styles.instructionsContainer}>
+              <View style={[styles.instructionsContainer, { backgroundColor: isDark ? colors.surfaceVariant : "#f3f4f6" }]}>
                 <Text
                   style={[
                     styles.instructionsText,
@@ -868,7 +874,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "flex-end",
-    backgroundColor: "#dbeafe",
     padding: 12,
     borderRadius: 8,
     marginBottom: 16,
@@ -876,10 +881,8 @@ const styles = StyleSheet.create({
   amountText: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#1e40af",
   },
   departmentDetails: {
-    backgroundColor: "#f8fafc",
     padding: 12,
     borderRadius: 8,
   },
@@ -903,14 +906,11 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 25,
     borderWidth: 1,
-    borderColor: "#e5e7eb",
-    backgroundColor: "#f9fafb",
     minWidth: 120,
     justifyContent: "center",
   },
   paymentOptionSelected: {
     borderColor: "#8b5cf6",
-    backgroundColor: "#f3f4f6",
   },
   paymentOptionText: {
     marginLeft: 8,
@@ -949,7 +949,6 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   instructionsContainer: {
-    backgroundColor: "#f3f4f6",
     padding: 16,
     borderRadius: 8,
     marginHorizontal: 16,
