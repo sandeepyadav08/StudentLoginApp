@@ -1,26 +1,19 @@
 # Student Login App
 
-A responsive React Native Expo app with a beautiful purple-themed login screen designed for students.
+A responsive React Native Expo app  designed for students.
 
 ## Features
-
-- ✅ **Beautiful Purple Theme** - Modern, elegant design matching your specifications
-- ✅ **Welcome Back Interface** - "Welcome Back!" title with journey subtitle
-- ✅ **Sign In Form** - Clean white card with "Sign In" header
 - ✅ **Responsive Layout** - Works perfectly on phones, tablets, and web
 - ✅ **Form Validation** - Real-time email format and password length validation
-- ✅ **Password Visibility Toggle** - Purple eye icon to show/hide password
+- ✅ **Password Visibility Toggle** - Eye icon to show/hide password
 - ✅ **Remember Me Checkbox** - Custom purple checkbox with functionality
 - ✅ **Complete Forgot Password Flow** - 4-step password recovery process
 - ✅ **OTP Verification Screen** - 4-digit OTP input with auto-focus
 - ✅ **Reset Password Screen** - New password with strength indicator
 - ✅ **Screen Navigation** - Smooth transitions between all screens
-- ✅ **Purple Login Button** - Prominent "LOGIN" button with shadow effects
 - ✅ **Mobile Optimized** - Perfectly optimized for phone screens
 - ✅ **API Integration** - Ready for backend integration
-- ✅ **Loading States** - Shows loading indicator during login
 - ✅ **Error Handling** - Displays validation and API errors
-- ✅ **Keyboard Handling** - Proper keyboard avoidance
   
 ### Prerequisites
 
@@ -30,19 +23,16 @@ A responsive React Native Expo app with a beautiful purple-themed login screen d
 
 ### Installation
 
-1. Clone or navigate to the project directory:
-   ```bash
-   cd StudentLoginApp
-   ```
-
-2. Install dependencies:
+1. Install dependencies:
    ```bash
    npm install
    ```
 
-3. Start the development server:
+2. Start the development server:
    ```bash
    npm start
+   or
+   npx expo start 
    ```
 
 4. Choose your platform:
@@ -50,22 +40,6 @@ A responsive React Native Expo app with a beautiful purple-themed login screen d
    - Press `a` to open Android emulator
    - Press `i` to open iOS simulator
    - Scan QR code with Expo Go app on your phone
-
-## API Integration
-
-### Current Implementation
-
-The app currently uses dummy API calls located in `services/api.js`. This allows you to test the login functionality without a backend.
-
-### Replacing with Real API
-
-To integrate with your actual backend:
-
-1. Open `services/api.js`
-2. Update the `API_BASE_URL` constant with your API endpoint
-3. Uncomment the real API implementation
-4. Comment out the dummy implementation
-5. Modify the API calls to match your backend structure
 
 ## File Structure
 
@@ -113,24 +87,6 @@ The app uses `Dimensions.get('window').width > 768` to detect larger screens and
 - Font sizes
 - Padding values
 - Form width
-
-## Adding Features
-
-### Persistent Login (AsyncStorage)
-
-To save user login state:
-
-1. Install AsyncStorage:
-   ```bash
-   expo install @react-native-async-storage/async-storage
-   ```
-
-2. Import in `App.js`:
-   ```javascript
-   import AsyncStorage from '@react-native-async-storage/async-storage';
-   ```
-
-3. Uncomment the AsyncStorage lines in the `handleLogin` function
 
 ### Navigation
 
