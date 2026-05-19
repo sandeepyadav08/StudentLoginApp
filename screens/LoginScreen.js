@@ -1,446 +1,405 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   Text,
   View,
-  TextInput,
+  Image,
   TouchableOpacity,
   Alert,
   ScrollView,
   Dimensions,
   KeyboardAvoidingView,
   Platform,
+  Animated,
+  ActivityIndicator,
+  TouchableWithoutFeedback,
+  Keyboard,
+  InteractionManager,
 } from 'react-native';
-import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loginAPI } from '../services/api';
+import FloatingInput from '../components/FloatingInput';
 
 const { width, height } = Dimensions.get('window');
 
-// Responsive utility functions
-const getResponsiveSize = (baseSize, screenWidth) => {
-  const scale = screenWidth / 375; // 375 is iPhone 6/7/8 width as base
-  return Math.round(baseSize * Math.max(scale, 0.8)); // Minimum scale of 0.8
-};
-
-const getResponsivePadding = (basePadding, screenWidth) => {
-  if (screenWidth < 350) return basePadding * 0.8;
-  if (screenWidth > 414) return basePadding * 1.2;
-  return basePadding;
-};
-
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function LoginScreen({ navigation }) {
-  const insets = useSafeAreaInsets();
-  const { width: screenWidth } = Dimensions.get('window');
-  
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({});
-  const [rememberMe, setRememberMe] = useState(false);
+  const [email, setEmail]             = useState('');
+  const [password, setPassword]       = useState('');
+  const [showPass, setShowPass]       = useState(false);
+  const [loading, setLoading]         = useState(false);
+  const [errors, setErrors]           = useState({});
+  const [rememberMe, setRememberMe]   = useState(false);
 
-  // Load saved email on component mount
+  // Animations
+  const logoScale   = useRef(new Animated.Value(0)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const cardY       = useRef(new Animated.Value(60)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const btnScale    = useRef(new Animated.Value(1)).current;
+  const shakeX      = useRef(new Animated.Value(0)).current;
+  const orb1Y       = useRef(new Animated.Value(0)).current;
+  const orb2Y       = useRef(new Animated.Value(0)).current;
+
   useEffect(() => {
-    loadSavedCredentials();
+    loadSaved();
+    const task = InteractionManager.runAfterInteractions(() => {
+      runEntrance();
+      floatOrbs();
+    });
+    return () => task.cancel();
   }, []);
 
-  const loadSavedCredentials = async () => {
+  const runEntrance = () => {
+    Animated.parallel([
+      Animated.spring(logoScale,   { toValue: 1, tension: 55, friction: 7, useNativeDriver: true }),
+      Animated.timing(logoOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
+      Animated.timing(cardY,       { toValue: 0, duration: 650, delay: 150, useNativeDriver: true }),
+      Animated.timing(cardOpacity, { toValue: 1, duration: 600, delay: 150, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const floatOrbs = () => {
+    const loop = (anim, dur, delay = 0) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(anim, { toValue: 1, duration: dur, delay, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0, duration: dur, useNativeDriver: true }),
+        ])
+      ).start();
+    loop(orb1Y, 4000);
+    loop(orb2Y, 3500, 800);
+  };
+
+  const shakeCard = () => {
+    Animated.sequence([
+      Animated.timing(shakeX, { toValue: 10,  duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: -10, duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 7,   duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: -7,  duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 0,   duration: 55, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const pressBtn = (cb) => {
+    Animated.sequence([
+      Animated.timing(btnScale, { toValue: 0.95, duration: 80, useNativeDriver: true }),
+      Animated.timing(btnScale, { toValue: 1,    duration: 80, useNativeDriver: true }),
+    ]).start(() => cb && cb());
+  };
+
+  const loadSaved = async () => {
     try {
-      const savedEmail = await AsyncStorage.getItem('rememberedEmail');
-      if (savedEmail) {
-        setEmail(savedEmail);
-        setRememberMe(true);
-      }
-    } catch (error) {
-      console.error('Error loading saved credentials:', error);
-    }
+      const saved = await AsyncStorage.getItem('rememberedEmail');
+      if (saved) { setEmail(saved); setRememberMe(true); }
+    } catch {}
   };
 
-  const handleRememberMeToggle = async () => {
-    const newRememberMe = !rememberMe;
-    setRememberMe(newRememberMe);
-    
-    // If unchecking remember me, clear saved email
-    if (!newRememberMe) {
+  const toggleRemember = async () => {
+    const next = !rememberMe;
+    setRememberMe(next);
+    if (!next) try { await AsyncStorage.removeItem('rememberedEmail'); } catch {}
+  };
+
+  const validate = () => {
+    const e = {};
+    if (!email.trim())                              e.email    = 'Email is required';
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) e.email = 'Enter a valid email';
+    if (!password.trim())                           e.password = 'Password is required';
+    else if (password.length < 6)                  e.password = 'Minimum 6 characters';
+    setErrors(e);
+    if (Object.keys(e).length) shakeCard();
+    return !Object.keys(e).length;
+  };
+
+  const handleLogin = () => {
+    if (!validate()) return;
+    pressBtn(async () => {
+      setLoading(true);
       try {
-        await AsyncStorage.removeItem('rememberedEmail');
-      } catch (error) {
-        console.error('Error clearing saved email:', error);
+        const res = await loginAPI(email.trim(), password);
+        if (!res.success) {
+          Alert.alert('Login Failed', res.message, [{ text: 'OK', onPress: () => setLoading(false) }]);
+          return;
+        }
+        await AsyncStorage.setItem('userToken', res.token);
+        await AsyncStorage.setItem('userEmail', email.trim());
+        if (res.user) await AsyncStorage.setItem('userData', JSON.stringify(res.user));
+        if (rememberMe) await AsyncStorage.setItem('rememberedEmail', email.trim());
+        else await AsyncStorage.removeItem('rememberedEmail');
+        navigation.replace('Dashboard');
+      } catch {
+        Alert.alert('Error', 'Something went wrong. Please try again.', [
+          { text: 'OK', onPress: () => setLoading(false) },
+        ]);
       }
-    }
+    });
   };
 
-  // Email validation
-  const validateEmail = (email) => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  // Password validation
-  const validatePassword = (password) => {
-    return password.length >= 6;
-  };
-
-  // Form validation
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!validateEmail(email)) {
-      newErrors.email = 'Please enter a valid email';
-    }
-
-    if (!password.trim()) {
-      newErrors.password = 'Password is required';
-    } else if (!validatePassword(password)) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // Handle login
-const handleLogin = async () => {
-  if (!validateForm()) {
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    const response = await loginAPI(email.trim(), password);
-    console.log(response);
-
-    if (!response.success) {
-      Alert.alert(
-        'Error',
-        response.message,
-        [
-          {
-            text: 'OK',
-            onPress: () => setLoading(false), // ✅ Re-enable login button
-          },
-        ]
-      );
-      return;
-    }
-
-    // Store token and user data
-    await AsyncStorage.setItem('userToken', response.token);
-    await AsyncStorage.setItem('userEmail', email.trim());
-    if (response.user) {
-      await AsyncStorage.setItem('userData', JSON.stringify(response.user));
-    }
-
-    // Save email if remember me is checked
-    if (rememberMe) {
-      await AsyncStorage.setItem('rememberedEmail', email.trim());
-    } else {
-      await AsyncStorage.removeItem('rememberedEmail');
-    }
-
-    console.log('User logged in:', response.user);
-    console.log('Token stored successfully');
-
-    const storedToken = await AsyncStorage.getItem('userToken');
-    console.log('Stored token is:', storedToken);
-
-    navigation.replace('Dashboard');
-  } catch (error) {
-    Alert.alert(
-      'Error',
-      'Something went wrong. Please try again.',
-      [
-        { text: 'OK', onPress: () => setLoading(false) } // ✅ Re-enable on error also
-      ]
-    );
-  }
-};
-  // Clear error when user starts typing
-  const handleEmailChange = (text) => {
-    setEmail(text);
-    if (errors.email) {
-      setErrors({ ...errors, email: null });
-    }
-  };
-
-  const handlePasswordChange = (text) => {
-    setPassword(text);
-    if (errors.password) {
-      setErrors({ ...errors, password: null });
-    }
-  };
+  const orb1Trans = orb1Y.interpolate({ inputRange: [0, 1], outputRange: [0, 22] });
+  const orb2Trans = orb2Y.interpolate({ inputRange: [0, 1], outputRange: [0, -18] });
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={s.safe}>
       <StatusBar style="dark" />
-      <KeyboardAvoidingView 
-        style={styles.container} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-      <ScrollView 
-        contentContainerStyle={[styles.scrollContainer, {
-          paddingHorizontal: getResponsivePadding(16, screenWidth),
-          paddingVertical: getResponsivePadding(30, screenWidth)
-        }]}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {/* Header */}
-        <View style={[styles.header, {
-          marginBottom: getResponsivePadding(40, screenWidth),
-          paddingTop: getResponsivePadding(20, screenWidth)
-        }]}>
-          <Text style={[styles.title, { fontSize: getResponsiveSize(28, screenWidth) }]}>Welcome Back!</Text>
-          <Text style={[styles.subtitle, { 
-            fontSize: getResponsiveSize(16, screenWidth),
-            paddingHorizontal: getResponsivePadding(20, screenWidth)
-          }]}>Sign in to continue your journey</Text>
-        </View>
 
-        {/* Login Form */}
-        <View style={[styles.form, {
-          padding: getResponsivePadding(24, screenWidth),
-          marginHorizontal: getResponsivePadding(8, screenWidth)
-        }]}>
-          <Text style={[styles.formTitle, { 
-            fontSize: getResponsiveSize(24, screenWidth),
-            marginBottom: getResponsivePadding(30, screenWidth)
-          }]}>Sign In</Text>
-          
-          {/* Email Input */}
-          <View style={styles.inputContainer}>
-            <View style={[styles.inputWrapper, errors.email && styles.inputError]}>
-              <TextInput
-                style={styles.input}
-                placeholder="Email"
-                placeholderTextColor="#9ca3af"
-                value={email}
-                onChangeText={handleEmailChange}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!loading}
-              />
-            </View>
-            {errors.email && <Text style={styles.errorText}>{errors.email}</Text>}
-          </View>
+      {/* ── Background Orbs ── */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Animated.View style={[s.orb1, { transform: [{ translateY: orb1Trans }] }]} />
+        <Animated.View style={[s.orb2, { transform: [{ translateY: orb2Trans }] }]} />
+        <View style={s.orb3} />
+      </View>
 
-          {/* Password Input */}
-          <View style={styles.inputContainer}>
-            <View style={[styles.inputWrapper, errors.password && styles.inputError]}>
-              <TextInput
-                style={styles.input}
-                placeholder="Password"
-                placeholderTextColor="#9ca3af"
-                value={password}
-                onChangeText={handlePasswordChange}
-                secureTextEntry={!showPassword}
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!loading}
-              />
-              <TouchableOpacity
-                style={styles.eyeIcon}
-                onPress={() => setShowPassword(!showPassword)}
-                disabled={loading}
-              >
-                <Ionicons 
-                  name={showPassword ? 'eye-outline' : 'eye-off-outline'} 
-                  size={22} 
-                  color="#a855f7" 
-                />
-              </TouchableOpacity>
-            </View>
-            {errors.password && <Text style={styles.errorText}>{errors.password}</Text>}
-          </View>
-
-          {/* Remember Me and Forgot Password Row */}
-          <View style={styles.optionsRow}>
-            <TouchableOpacity 
-              style={styles.rememberMeContainer}
-              onPress={handleRememberMeToggle}
-            >
-              <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
-                {rememberMe && <Ionicons name="checkmark" size={16} color="white" />}
-              </View>
-              <Text style={styles.rememberMeText}>Remember me</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')}>
-              <Text style={styles.forgotPasswordText}>Forgot password</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Login Button */}
-          <TouchableOpacity
-            style={[styles.loginButton, loading && styles.loginButtonDisabled]}
-            onPress={handleLogin}
-            disabled={loading}
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <ScrollView
+            contentContainerStyle={s.scroll}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            {loading ? (
-              <Text style={styles.loginButtonText}>Logging in...</Text>
-            ) : (
-              <Text style={styles.loginButtonText}>LOGIN</Text>
-            )}
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-      </KeyboardAvoidingView>
+            {/* ── Brand / Logo ── */}
+            <Animated.View style={[s.brand, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
+              <View style={s.logoRing}>
+                <View style={s.logoCircle}>
+                  <Image
+                    source={require('../assets/iimt_logo_icon.png')}
+                    style={s.logoImage}
+                    resizeMode="contain"
+                  />
+                </View>
+              </View>
+              <Text style={s.appName}>IIMT Portal</Text>
+              <Text style={s.tagline}>Your academic journey starts here</Text>
+            </Animated.View>
+
+            {/* ── Card ── */}
+            <Animated.View
+              style={[s.card, {
+                opacity: cardOpacity,
+                transform: [{ translateY: cardY }, { translateX: shakeX }],
+              }]}
+            >
+              {/* Card Header */}
+              <View style={s.cardHeader}>
+                <Text style={s.cardTitle}>Welcome Back</Text>
+                <Text style={s.cardSub}>Sign in to continue</Text>
+              </View>
+
+              {/* Inputs */}
+              <View style={{ marginTop: 20 }}>
+                <FloatingInput
+                  label="Email Address"
+                  icon="mail-outline"
+                  value={email}
+                  keyboardType="email-address"
+                  onChangeText={(t) => { setEmail(t); setErrors(e => ({ ...e, email: null })); }}
+                  error={errors.email}
+                  editable={!loading}
+                />
+                <FloatingInput
+                  label="Password"
+                  icon="lock-closed-outline"
+                  value={password}
+                  secureTextEntry={!showPass}
+                  onChangeText={(t) => { setPassword(t); setErrors(e => ({ ...e, password: null })); }}
+                  error={errors.password}
+                  editable={!loading}
+                  rightIcon={
+                    <TouchableOpacity onPress={() => setShowPass(v => !v)} disabled={loading} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name={showPass ? 'eye-outline' : 'eye-off-outline'} size={20} color="#A0AEC0" />
+                    </TouchableOpacity>
+                  }
+                />
+              </View>
+
+              {/* Remember + Forgot */}
+              <View style={s.optRow}>
+                <TouchableOpacity style={s.remRow} onPress={toggleRemember} activeOpacity={0.7}>
+                  <View style={[s.checkbox, rememberMe && s.checkOn]}>
+                    {rememberMe && <Ionicons name="checkmark" size={12} color="#FFF" />}
+                  </View>
+                  <Text style={s.remText}>Remember me</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')} activeOpacity={0.7}>
+                  <Text style={s.forgotText}>Forgot password?</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Sign In Button */}
+              <Animated.View style={{ transform: [{ scale: btnScale }] }}>
+                <TouchableOpacity
+                  style={[s.btn, loading && s.btnOff]}
+                  onPress={handleLogin}
+                  disabled={loading}
+                  activeOpacity={0.9}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFF" size="small" />
+                  ) : (
+                    <View style={s.btnInner}>
+                      <Text style={s.btnText}>Sign In</Text>
+                      <View style={s.btnArrow}>
+                        <Ionicons name="arrow-forward" size={16} color="#6C63FF" />
+                      </View>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+
+            </Animated.View>
+
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#f3e8ff', // Light purple background
+// ─── Styles ───────────────────────────────────────────────────────────────────
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#F0EEFF' },
+
+  // Orbs
+  orb1: {
+    position: 'absolute',
+    width: width * 0.75,
+    height: width * 0.75,
+    borderRadius: width * 0.375,
+    backgroundColor: 'rgba(108, 99, 255, 0.13)',
+    top: -width * 0.22,
+    left: -width * 0.18,
   },
-  container: {
-    flex: 1,
-    backgroundColor: '#f3e8ff', // Light purple background
+  orb2: {
+    position: 'absolute',
+    width: width * 0.55,
+    height: width * 0.55,
+    borderRadius: width * 0.275,
+    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    bottom: height * 0.08,
+    right: -width * 0.12,
   },
-  scrollContainer: {
+  orb3: {
+    position: 'absolute',
+    width: width * 0.32,
+    height: width * 0.32,
+    borderRadius: width * 0.16,
+    backgroundColor: 'rgba(236, 72, 153, 0.07)',
+    top: height * 0.38,
+    right: -width * 0.06,
+  },
+
+  // Scroll
+  scroll: {
     flexGrow: 1,
+    justifyContent: 'flex-start',
+    paddingHorizontal: 22,
+    paddingTop: height * 0.06,
+    paddingBottom: 40,
+    minHeight: height - 80,
+  },
+
+  // Brand
+  brand: { alignItems: 'center', marginBottom: 28 },
+  logoRing: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(108, 99, 255, 0.12)',
     justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 30,
-    minHeight: height - 100, // Account for status bar and safe area
-  },
-  header: {
     alignItems: 'center',
-    marginBottom: 40,
-    paddingTop: 20,
+    marginBottom: 14,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#7c3aed', // Purple color
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6b7280', // Gray color
-    textAlign: 'center',
-    lineHeight: 22,
-    paddingHorizontal: 20,
-  },
-  form: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 24,
-    marginHorizontal: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  formTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#7c3aed', // Purple color
-    textAlign: 'center',
-    marginBottom: 30,
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
+  logoCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#d1d5db', // Light gray border
-    borderRadius: 12,
-    backgroundColor: '#f9fafb', // Very light gray background
-    paddingHorizontal: 16,
-    height: 54,
+    shadowColor: '#6C63FF',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 14,
+    elevation: 10,
   },
-  inputError: {
-    borderColor: '#ef4444',
-    backgroundColor: '#fef2f2',
+  logoImage: {
+    width: 60,
+    height: 60,
   },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: '#374151',
-    paddingVertical: 0,
+  appName: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#1A1A2E',
+    letterSpacing: 0.4,
+    marginBottom: 4,
   },
-  eyeIcon: {
-    padding: 8,
+  tagline: { fontSize: 13.5, color: '#718096', textAlign: 'center' },
+
+  // Card
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 26,
+    padding: 26,
+    shadowColor: '#4C1D95',
+    shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.13,
+    shadowRadius: 28,
+    elevation: 12,
   },
-  errorText: {
-    fontSize: 12,
-    color: '#ef4444',
-    marginTop: 4,
-    marginLeft: 4,
-  },
-  optionsRow: {
+  cardHeader: { marginBottom: 4 },
+  cardTitle: { fontSize: 21, fontWeight: '700', color: '#1A1A2E', marginBottom: 3 },
+  cardSub: { fontSize: 14, color: '#A0AEC0', fontWeight: '400' },
+
+  // Options row
+  optRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 24,
     marginTop: 8,
+    marginBottom: 22,
   },
-  rememberMeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
+  remRow: { flexDirection: 'row', alignItems: 'center' },
   checkbox: {
     width: 20,
     height: 20,
+    borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#7c3aed',
-    borderRadius: 4,
+    borderColor: '#CBD5E0',
     marginRight: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  checkboxChecked: {
-    backgroundColor: '#7c3aed',
-  },
-  rememberMeText: {
-    fontSize: 14,
-    color: '#374151',
-  },
-  forgotPasswordText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textDecorationLine: 'underline',
-  },
-  loginButton: {
-    backgroundColor: '#7c3aed', // Purple background
-    borderRadius: 12,
-    height: 54,
+  checkOn: { backgroundColor: '#6C63FF', borderColor: '#6C63FF' },
+  remText: { fontSize: 13, color: '#4A5568', fontWeight: '500' },
+  forgotText: { fontSize: 13, color: '#6C63FF', fontWeight: '600' },
+
+  // Button
+  btn: {
+    backgroundColor: '#6C63FF',
+    borderRadius: 14,
+    height: 56,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 20,
-    shadowColor: '#7c3aed',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    marginBottom: 22,
+    shadowColor: '#6C63FF',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.38,
+    shadowRadius: 14,
+    elevation: 8,
   },
-  loginButtonDisabled: {
-    backgroundColor: '#d1d5db',
-    shadowColor: 'transparent',
-    elevation: 0,
+  btnOff: { backgroundColor: '#C4C4C4', shadowColor: 'transparent', elevation: 0 },
+  btnInner: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  btnText: { fontSize: 16, fontWeight: '700', color: '#FFF', letterSpacing: 0.3 },
+  btnArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#FFF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  loginButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    letterSpacing: 1,
-  },
+
 });

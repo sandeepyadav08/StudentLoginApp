@@ -1,447 +1,359 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
-  Dimensions,
-  KeyboardAvoidingView,
-  Platform,
+  StyleSheet, Text, View, TouchableOpacity, Alert,
+  ScrollView, Dimensions, KeyboardAvoidingView, Platform,
+  Animated, ActivityIndicator, TouchableWithoutFeedback, Keyboard,
+  InteractionManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { resetPasswordAPI } from '../services/api';
+import FloatingInput from '../components/FloatingInput';
 
 const { width, height } = Dimensions.get('window');
 
+const getStrength = (pw) => {
+  if (!pw)             return { label: '',       color: '#E2E8F0', pct: '0%'  };
+  if (pw.length < 6)   return { label: 'Weak',   color: '#EF4444', pct: '33%' };
+  if (pw.length < 8)   return { label: 'Medium', color: '#F59E0B', pct: '66%' };
+  const strong = [/[A-Z]/, /[a-z]/, /\d/, /[!@#$%^&*]/.test(pw)].filter(r => typeof r === 'boolean' ? r : r.test(pw)).length >= 3;
+  return strong
+    ? { label: 'Strong', color: '#10B981', pct: '100%' }
+    : { label: 'Medium', color: '#F59E0B', pct: '66%'  };
+};
+
 export default function ResetPasswordScreen({ navigation, route }) {
   const { email, otpToken, otpVerified } = route.params || {};
-  
-  // Security check - ensure user came from OTP verification
-  React.useEffect(() => {
-    if (!email || !otpToken || !otpVerified) {
-      Alert.alert(
-        'Access Denied',
-        'Please verify your OTP first to reset password.',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('ForgotPassword')
-          }
-        ]
-      );
-    }
-  }, [email, otpToken, otpVerified, navigation]);
-  const [newPassword, setNewPassword] = useState('');
+
+  const [newPassword, setNewPassword]         = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [showNew, setShowNew]                 = useState(false);
+  const [showConfirm, setShowConfirm]         = useState(false);
+  const [loading, setLoading]                 = useState(false);
+  const [errors, setErrors]                   = useState({});
 
-  // Password validation
-  const validatePassword = (password) => {
-    return password.length >= 8;
-  };
+  const iconScale   = useRef(new Animated.Value(0)).current;
+  const cardY       = useRef(new Animated.Value(50)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const btnScale    = useRef(new Animated.Value(1)).current;
+  const shakeX      = useRef(new Animated.Value(0)).current;
+  const orb1Y       = useRef(new Animated.Value(0)).current;
+  const orb2Y       = useRef(new Animated.Value(0)).current;
+  const strengthW   = useRef(new Animated.Value(0)).current;
 
-  // Password strength validation
-  const getPasswordStrength = (password) => {
-    if (password.length === 0) return { strength: 'none', color: '#d1d5db' };
-    if (password.length < 6) return { strength: 'weak', color: '#ef4444' };
-    if (password.length < 8) return { strength: 'medium', color: '#f59e0b' };
-    
-    const hasUpper = /[A-Z]/.test(password);
-    const hasLower = /[a-z]/.test(password);
-    const hasNumber = /\d/.test(password);
-    const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-    
-    const score = [hasUpper, hasLower, hasNumber, hasSpecial].filter(Boolean).length;
-    
-    if (score >= 3 && password.length >= 8) return { strength: 'strong', color: '#10b981' };
-    return { strength: 'medium', color: '#f59e0b' };
-  };
-
-  // Form validation
-  const validateForm = () => {
-    const newErrors = {};
-
-    if (!newPassword.trim()) {
-      newErrors.newPassword = 'New password is required';
-    } else if (!validatePassword(newPassword)) {
-      newErrors.newPassword = 'Password must be at least 8 characters';
-    }
-
-    if (!confirmPassword.trim()) {
-      newErrors.confirmPassword = 'Please confirm your password';
-    } else if (newPassword !== confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  // Handle password reset
-  const handleResetPassword = async () => {
-    // Security check before proceeding
+  useEffect(() => {
     if (!email || !otpToken || !otpVerified) {
-      Alert.alert(
-        'Error',
-        'Invalid session. Please start over.',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('ForgotPassword')
-          }
-        ]
-      );
+      Alert.alert('Access Denied', 'Please verify your OTP first.', [
+        { text: 'OK', onPress: () => navigation.navigate('ForgotPassword') },
+      ]);
+    }
+
+    const task = InteractionManager.runAfterInteractions(() => {
+      Animated.parallel([
+        Animated.spring(iconScale,   { toValue: 1, tension: 55, friction: 7, useNativeDriver: true }),
+        Animated.timing(cardY,       { toValue: 0, duration: 600, delay: 100, useNativeDriver: true }),
+        Animated.timing(cardOpacity, { toValue: 1, duration: 550, delay: 100, useNativeDriver: true }),
+      ]).start();
+
+      const loop = (anim, dur, delay = 0) =>
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(anim, { toValue: 1, duration: dur, delay, useNativeDriver: true }),
+            Animated.timing(anim, { toValue: 0, duration: dur, useNativeDriver: true }),
+          ])
+        ).start();
+      loop(orb1Y, 4000);
+      loop(orb2Y, 3500, 900);
+    });
+    return () => task.cancel();
+  }, []);
+
+  // Animate strength bar
+  useEffect(() => {
+    const str = getStrength(newPassword);
+    const target = parseFloat(str.pct) / 100;
+    Animated.timing(strengthW, { toValue: target, duration: 300, useNativeDriver: false }).start();
+  }, [newPassword]);
+
+  const shakeCard = () => {
+    Animated.sequence([
+      Animated.timing(shakeX, { toValue: 10,  duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: -10, duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 7,   duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: -7,  duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 0,   duration: 55, useNativeDriver: true }),
+    ]).start();
+  };
+
+  const validate = () => {
+    const e = {};
+    if (!newPassword.trim()) e.newPassword = 'Password is required';
+    else if (newPassword.length < 8) e.newPassword = 'Minimum 8 characters required';
+    if (!confirmPassword.trim()) e.confirmPassword = 'Please confirm your password';
+    else if (newPassword !== confirmPassword) e.confirmPassword = 'Passwords do not match';
+    setErrors(e);
+    if (Object.keys(e).length) shakeCard();
+    return !Object.keys(e).length;
+  };
+
+  const handleReset = () => {
+    if (!email || !otpToken || !otpVerified) {
+      Alert.alert('Error', 'Invalid session. Please start over.', [
+        { text: 'OK', onPress: () => navigation.navigate('ForgotPassword') },
+      ]);
       return;
     }
+    if (!validate()) return;
 
-    if (!validateForm()) {
-      return;
-    }
-
-    setLoading(true);
-    try {
-      // Import the resetPasswordAPI - uses combined OTP verification and password update
-      const { resetPasswordAPI } = require('../services/api');
-      const response = await resetPasswordAPI(email, otpToken, newPassword);
-      
-      // If we reach here, password reset was successful
-      Alert.alert(
-        'Password Reset Successful', 
-        response.message || 'Your password has been reset successfully! You can now login with your new password.',
-        [
-          {
-            text: 'Login Now',
-            onPress: () => navigation.navigate('Login')
-          }
-        ]
-      );
-    } catch (error) {
-      // Show only a user-friendly alert, avoid noisy console errors in production
-      Alert.alert('Error', error.message || 'Failed to reset password. Please try again.');
-    } finally {
-      setLoading(false);
-    }
+    Animated.sequence([
+      Animated.timing(btnScale, { toValue: 0.95, duration: 80, useNativeDriver: true }),
+      Animated.timing(btnScale, { toValue: 1,    duration: 80, useNativeDriver: true }),
+    ]).start(async () => {
+      setLoading(true);
+      try {
+        const { resetPasswordAPI } = require('../services/api');
+        const res = await resetPasswordAPI(email, otpToken, newPassword);
+        Alert.alert('Password Reset!', res.message || 'Your password has been reset successfully.', [
+          { text: 'Sign In', onPress: () => navigation.navigate('Login') },
+        ]);
+      } catch (err) {
+        Alert.alert('Error', err.message || 'Failed to reset password. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    });
   };
 
-  // Clear error when user starts typing
-  const handleNewPasswordChange = (text) => {
-    setNewPassword(text);
-    if (errors.newPassword) {
-      setErrors({ ...errors, newPassword: null });
-    }
-  };
-
-  const handleConfirmPasswordChange = (text) => {
-    setConfirmPassword(text);
-    if (errors.confirmPassword) {
-      setErrors({ ...errors, confirmPassword: null });
-    }
-  };
-
-  const passwordStrength = getPasswordStrength(newPassword);
+  const strength  = getStrength(newPassword);
+  const orb1T     = orb1Y.interpolate({ inputRange: [0, 1], outputRange: [0, 22] });
+  const orb2T     = orb2Y.interpolate({ inputRange: [0, 1], outputRange: [0, -18] });
+  const barWidth  = strengthW.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={s.safe}>
       <StatusBar style="dark" />
-      <KeyboardAvoidingView 
-        style={styles.container} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContainer}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* Reset Password Form */}
-          <View style={styles.form}>
-            <Text style={styles.formTitle}>Reset Password</Text>
-            
-            <Text style={styles.description}>
-              Create a new password for{'\n'}
-              <Text style={styles.emailText}>{email}</Text>
-            </Text>
 
-            {/* New Password Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>New Password</Text>
-              <View style={[styles.inputWrapper, errors.newPassword && styles.inputError]}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter new password"
-                  placeholderTextColor="#9ca3af"
-                  value={newPassword}
-                  onChangeText={handleNewPasswordChange}
-                  secureTextEntry={!showNewPassword}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={!loading}
-                />
-                <TouchableOpacity
-                  style={styles.eyeIcon}
-                  onPress={() => setShowNewPassword(!showNewPassword)}
-                  disabled={loading}
-                >
-                  <Ionicons 
-                    name={showNewPassword ? 'eye-outline' : 'eye-off-outline'} 
-                    size={22} 
-                    color="#a855f7" 
-                  />
-                </TouchableOpacity>
+      {/* Background Orbs */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Animated.View style={[s.orb1, { transform: [{ translateY: orb1T }] }]} />
+        <Animated.View style={[s.orb2, { transform: [{ translateY: orb2T }] }]} />
+        <View style={s.orb3} />
+      </View>
+
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <ScrollView
+            contentContainerStyle={s.scroll}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Back Button */}
+            <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+              <View style={s.backCircle}>
+                <Ionicons name="arrow-back" size={20} color="#6C63FF" />
               </View>
-              {errors.newPassword && <Text style={styles.errorText}>{errors.newPassword}</Text>}
-              
-              {/* Password Strength Indicator */}
-              {newPassword.length > 0 && (
-                <View style={styles.strengthContainer}>
-                  <View style={styles.strengthBar}>
-                    <View 
-                      style={[
-                        styles.strengthFill, 
-                        { 
-                          backgroundColor: passwordStrength.color,
-                          width: passwordStrength.strength === 'weak' ? '33%' : 
-                                passwordStrength.strength === 'medium' ? '66%' : '100%'
-                        }
-                      ]} 
-                    />
-                  </View>
-                  <Text style={[styles.strengthText, { color: passwordStrength.color }]}>
-                    {passwordStrength.strength === 'weak' && 'Weak'}
-                    {passwordStrength.strength === 'medium' && 'Medium'}
-                    {passwordStrength.strength === 'strong' && 'Strong'}
-                  </Text>
+            </TouchableOpacity>
+
+            {/* Icon */}
+            <Animated.View style={[s.iconSection, { transform: [{ scale: iconScale }] }]}>
+              <View style={s.iconRing}>
+                <View style={s.iconCircle}>
+                  <Ionicons name="key-outline" size={34} color="#FFFFFF" />
                 </View>
-              )}
-            </View>
-
-            {/* Confirm Password Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Confirm Password</Text>
-              <View style={[styles.inputWrapper, errors.confirmPassword && styles.inputError]}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Confirm new password"
-                  placeholderTextColor="#9ca3af"
-                  value={confirmPassword}
-                  onChangeText={handleConfirmPasswordChange}
-                  secureTextEntry={!showConfirmPassword}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={!loading}
-                />
-                <TouchableOpacity
-                  style={styles.eyeIcon}
-                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  disabled={loading}
-                >
-                  <Ionicons 
-                    name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'} 
-                    size={22} 
-                    color="#a855f7" 
-                  />
-                </TouchableOpacity>
               </View>
-              {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
-            </View>
+              <Text style={s.screenTitle}>Reset Password</Text>
+              <Text style={s.screenSub}>Create a strong new password for</Text>
+              <Text style={s.emailHighlight}>{email}</Text>
+            </Animated.View>
 
-            {/* Password Requirements */}
-            <View style={styles.requirementsContainer}>
-              <Text style={styles.requirementsTitle}>Password must contain:</Text>
-              <Text style={styles.requirementText}>• At least 8 characters</Text>
-              <Text style={styles.requirementText}>• Mix of uppercase & lowercase letters</Text>
-              <Text style={styles.requirementText}>• At least one number</Text>
-              <Text style={styles.requirementText}>• At least one special character</Text>
-            </View>
-
-            {/* Reset Password Button */}
-            <TouchableOpacity
-              style={[styles.resetButton, loading && styles.resetButtonDisabled]}
-              onPress={handleResetPassword}
-              disabled={loading}
+            {/* Card */}
+            <Animated.View
+              style={[s.card, {
+                opacity: cardOpacity,
+                transform: [{ translateY: cardY }, { translateX: shakeX }],
+              }]}
             >
-              {loading ? (
-                <Text style={styles.resetButtonText}>Resetting...</Text>
-              ) : (
-                <Text style={styles.resetButtonText}>RESET PASSWORD</Text>
-              )}
-            </TouchableOpacity>
+              <Text style={s.cardTitle}>New Password</Text>
+              <Text style={s.cardSub}>Must be at least 8 characters</Text>
 
-            {/* Back to Login */}
-            <TouchableOpacity 
-              style={styles.backToLoginContainer}
-              onPress={() => navigation.navigate('Login')}
-            >
-              <Text style={styles.backToLoginText}>Back to Login</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+              <View style={{ marginTop: 20 }}>
+                {/* New Password */}
+                <FloatingInput
+                  label="New Password"
+                  icon="lock-closed-outline"
+                  value={newPassword}
+                  secureTextEntry={!showNew}
+                  onChangeText={(t) => { setNewPassword(t); setErrors(e => ({ ...e, newPassword: null })); }}
+                  error={errors.newPassword}
+                  editable={!loading}
+                  rightIcon={
+                    <TouchableOpacity onPress={() => setShowNew(v => !v)} disabled={loading} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                      <Ionicons name={showNew ? 'eye-outline' : 'eye-off-outline'} size={20} color="#A0AEC0" />
+                    </TouchableOpacity>
+                  }
+                />
+
+                {/* Strength Bar */}
+                {newPassword.length > 0 && (
+                  <View style={s.strengthWrap}>
+                    <View style={s.strengthTrack}>
+                      <Animated.View style={[s.strengthFill, { width: barWidth, backgroundColor: strength.color }]} />
+                    </View>
+                    <Text style={[s.strengthLabel, { color: strength.color }]}>{strength.label}</Text>
+                  </View>
+                )}
+
+                {/* Confirm Password */}
+                <View style={{ marginTop: 6 }}>
+                  <FloatingInput
+                    label="Confirm Password"
+                    icon="lock-open-outline"
+                    value={confirmPassword}
+                    secureTextEntry={!showConfirm}
+                    onChangeText={(t) => { setConfirmPassword(t); setErrors(e => ({ ...e, confirmPassword: null })); }}
+                    error={errors.confirmPassword}
+                    editable={!loading}
+                    rightIcon={
+                      <TouchableOpacity onPress={() => setShowConfirm(v => !v)} disabled={loading} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                        <Ionicons name={showConfirm ? 'eye-outline' : 'eye-off-outline'} size={20} color="#A0AEC0" />
+                      </TouchableOpacity>
+                    }
+                  />
+                </View>
+              </View>
+
+              {/* Password Rules */}
+              <View style={s.rulesBox}>
+                {[
+                  ['At least 8 characters',              newPassword.length >= 8],
+                  ['Uppercase & lowercase letters',       /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword)],
+                  ['At least one number',                 /\d/.test(newPassword)],
+                ].map(([rule, met]) => (
+                  <View key={rule} style={s.ruleRow}>
+                    <Ionicons name={met ? 'checkmark-circle' : 'ellipse-outline'} size={14} color={met ? '#10B981' : '#CBD5E0'} />
+                    <Text style={[s.ruleText, met && s.ruleTextMet]}>{rule}</Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Reset Button */}
+              <Animated.View style={{ transform: [{ scale: btnScale }] }}>
+                <TouchableOpacity
+                  style={[s.btn, loading && s.btnOff]}
+                  onPress={handleReset}
+                  disabled={loading}
+                  activeOpacity={0.9}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFF" size="small" />
+                  ) : (
+                    <View style={s.btnInner}>
+                      <Text style={s.btnText}>Reset Password</Text>
+                      <View style={s.btnArrow}>
+                        <Ionicons name="checkmark" size={16} color="#6C63FF" />
+                      </View>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/* Back to Login */}
+              <TouchableOpacity style={s.loginRow} onPress={() => navigation.navigate('Login')} activeOpacity={0.7}>
+                <Ionicons name="arrow-back-outline" size={15} color="#6C63FF" />
+                <Text style={s.loginText}> Back to Sign In</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#f3e8ff', // Light purple background
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#F0EEFF' },
+
+  orb1: {
+    position: 'absolute', width: width * 0.75, height: width * 0.75,
+    borderRadius: width * 0.375, backgroundColor: 'rgba(108, 99, 255, 0.13)',
+    top: -width * 0.22, left: -width * 0.18,
   },
-  container: {
-    flex: 1,
-    backgroundColor: '#f3e8ff', // Light purple background
+  orb2: {
+    position: 'absolute', width: width * 0.55, height: width * 0.55,
+    borderRadius: width * 0.275, backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    bottom: height * 0.08, right: -width * 0.12,
   },
-  scrollContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 30,
-    minHeight: height - 100,
+  orb3: {
+    position: 'absolute', width: width * 0.32, height: width * 0.32,
+    borderRadius: width * 0.16, backgroundColor: 'rgba(236, 72, 153, 0.07)',
+    top: height * 0.38, right: -width * 0.06,
   },
-  form: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 24,
-    marginHorizontal: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+
+  scroll: {
+    flexGrow: 1, paddingHorizontal: 22, paddingVertical: 28, minHeight: height - 80,
   },
-  formTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#7c3aed',
-    textAlign: 'center',
-    marginBottom: 16,
+
+  backBtn: { marginBottom: 8 },
+  backCircle: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15, shadowRadius: 6, elevation: 4,
   },
-  description: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 20,
+
+  iconSection: { alignItems: 'center', marginBottom: 24, marginTop: 8 },
+  iconRing: {
+    width: 92, height: 92, borderRadius: 46,
+    backgroundColor: 'rgba(108, 99, 255, 0.15)',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 12,
   },
-  emailText: {
-    fontWeight: '600',
-    color: '#374151',
+  iconCircle: {
+    width: 72, height: 72, borderRadius: 36, backgroundColor: '#6C63FF',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4, shadowRadius: 16, elevation: 12,
   },
-  inputContainer: {
-    marginBottom: 20,
+  screenTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A2E', marginBottom: 4 },
+  screenSub: { fontSize: 13.5, color: '#718096' },
+  emailHighlight: { fontSize: 14, fontWeight: '700', color: '#6C63FF', marginTop: 2 },
+
+  card: {
+    backgroundColor: '#FFFFFF', borderRadius: 26, padding: 24,
+    shadowColor: '#4C1D95', shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.13, shadowRadius: 28, elevation: 12,
   },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
+  cardTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A2E', marginBottom: 3 },
+  cardSub: { fontSize: 13, color: '#A0AEC0' },
+
+  // Strength
+  strengthWrap: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: 6, gap: 10 },
+  strengthTrack: { flex: 1, height: 5, backgroundColor: '#EDF2F7', borderRadius: 3, overflow: 'hidden' },
+  strengthFill: { height: '100%', borderRadius: 3 },
+  strengthLabel: { fontSize: 12, fontWeight: '700', minWidth: 46 },
+
+  // Rules
+  rulesBox: {
+    backgroundColor: '#F8F8FF', borderRadius: 12, padding: 14,
+    marginBottom: 20, marginTop: 4, gap: 8,
   },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 12,
-    backgroundColor: '#f9fafb',
-    paddingHorizontal: 16,
-    height: 54,
+  ruleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  ruleText: { fontSize: 13, color: '#A0AEC0', fontWeight: '500' },
+  ruleTextMet: { color: '#2D3748' },
+
+  btn: {
+    backgroundColor: '#6C63FF', borderRadius: 14, height: 56,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.38, shadowRadius: 14, elevation: 8, marginBottom: 18,
   },
-  inputError: {
-    borderColor: '#ef4444',
-    backgroundColor: '#fef2f2',
+  btnOff: { backgroundColor: '#C4C4C4', shadowColor: 'transparent', elevation: 0 },
+  btnInner: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  btnText: { fontSize: 16, fontWeight: '700', color: '#FFF', letterSpacing: 0.3 },
+  btnArrow: {
+    width: 28, height: 28, borderRadius: 14, backgroundColor: '#FFF',
+    justifyContent: 'center', alignItems: 'center',
   },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: '#374151',
-    paddingVertical: 0,
-  },
-  eyeIcon: {
-    padding: 8,
-  },
-  errorText: {
-    fontSize: 12,
-    color: '#ef4444',
-    marginTop: 4,
-    marginLeft: 4,
-  },
-  strengthContainer: {
-    marginTop: 8,
-  },
-  strengthBar: {
-    height: 4,
-    backgroundColor: '#e5e7eb',
-    borderRadius: 2,
-    marginBottom: 4,
-  },
-  strengthFill: {
-    height: '100%',
-    borderRadius: 2,
-    transition: 'width 0.3s ease',
-  },
-  strengthText: {
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  requirementsContainer: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 24,
-  },
-  requirementsTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  requirementText: {
-    fontSize: 11,
-    color: '#6b7280',
-    marginBottom: 2,
-  },
-  resetButton: {
-    backgroundColor: '#7c3aed',
-    borderRadius: 12,
-    height: 54,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: '#7c3aed',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  resetButtonDisabled: {
-    backgroundColor: '#d1d5db',
-    shadowColor: 'transparent',
-    elevation: 0,
-  },
-  resetButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    letterSpacing: 1,
-  },
-  backToLoginContainer: {
-    alignItems: 'center',
-  },
-  backToLoginText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textDecorationLine: 'underline',
-  },
+
+  loginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  loginText: { fontSize: 14, color: '#6C63FF', fontWeight: '600' },
 });

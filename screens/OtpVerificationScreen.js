@@ -1,537 +1,421 @@
 import React, { useState, useRef, useEffect } from 'react';
 import {
-  StyleSheet,
-  Text,
-  View,
-  TextInput,
-  TouchableOpacity,
-  Alert,
-  ScrollView,
-  Dimensions,
-  KeyboardAvoidingView,
-  Platform,
+  StyleSheet, Text, View, TextInput, TouchableOpacity, Alert,
+  ScrollView, Dimensions, KeyboardAvoidingView, Platform,
+  Animated, ActivityIndicator, TouchableWithoutFeedback, Keyboard,
+  InteractionManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
-import { verifyOtpAPI } from '../services/api';
+import { Ionicons } from '@expo/vector-icons';
+import { verifyOtpAPI, forgotPasswordAPI } from '../services/api';
+import FloatingInput from '../components/FloatingInput';
 
 const { width, height } = Dimensions.get('window');
 
+// ─── Single OTP Box ───────────────────────────────────────────────────────────
+function OtpBox({ value, onChangeText, onKeyPress, inputRef, error, editable }) {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (value) {
+      Animated.sequence([
+        Animated.timing(scale, { toValue: 1.18, duration: 70, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1,    duration: 70, useNativeDriver: true }),
+      ]).start();
+    }
+  }, [value]);
+
+  return (
+    <Animated.View style={{ transform: [{ scale }] }}>
+      <TextInput
+        ref={inputRef}
+        style={[ob.box, value && ob.filled, error && ob.errBox]}
+        value={value}
+        onChangeText={onChangeText}
+        onKeyPress={onKeyPress}
+        keyboardType="numeric"
+        maxLength={1}
+        textAlign="center"
+        selectTextOnFocus
+        editable={editable}
+      />
+    </Animated.View>
+  );
+}
+
+const ob = StyleSheet.create({
+  box: {
+    width: (width - 44 - 22 * 2 - 5 * 10) / 6,
+    height: 52,
+    borderWidth: 1.5,
+    borderColor: '#E2E8F0',
+    borderRadius: 12,
+    backgroundColor: '#FAFAFA',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1A202C',
+    textAlign: 'center',
+  },
+  filled: { borderColor: '#6C63FF', backgroundColor: '#F0EEFF' },
+  errBox: { borderColor: '#EF4444', backgroundColor: '#FFF5F5' },
+});
+
+// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function OtpVerificationScreen({ navigation, route }) {
   const { email } = route.params || {};
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [newPassword, setNewPassword] = useState('');
+
+  const [otp, setOtp]                       = useState(['', '', '', '', '', '']);
+  const [newPassword, setNewPassword]       = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [showNewPassword, setShowNewPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [showNew, setShowNew]               = useState(false);
+  const [showConfirm, setShowConfirm]       = useState(false);
+  const [loading, setLoading]               = useState(false);
+  const [errors, setErrors]                 = useState({});
   const [resendDisabled, setResendDisabled] = useState(true);
-  const [countdown, setCountdown] = useState(30);
-  
-  // References for OTP inputs
+  const [countdown, setCountdown]           = useState(30);
+
   const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
 
-  // Countdown timer for resend button
+  // Animations
+  const iconScale   = useRef(new Animated.Value(0)).current;
+  const cardY       = useRef(new Animated.Value(50)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const btnScale    = useRef(new Animated.Value(1)).current;
+  const shakeX      = useRef(new Animated.Value(0)).current;
+  const orb1Y       = useRef(new Animated.Value(0)).current;
+  const orb2Y       = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      Animated.parallel([
+        Animated.spring(iconScale,   { toValue: 1, tension: 55, friction: 7, useNativeDriver: true }),
+        Animated.timing(cardY,       { toValue: 0, duration: 600, delay: 100, useNativeDriver: true }),
+        Animated.timing(cardOpacity, { toValue: 1, duration: 550, delay: 100, useNativeDriver: true }),
+      ]).start();
+
+      const loop = (anim, dur, delay = 0) =>
+        Animated.loop(
+          Animated.sequence([
+            Animated.timing(anim, { toValue: 1, duration: dur, delay, useNativeDriver: true }),
+            Animated.timing(anim, { toValue: 0, duration: dur, useNativeDriver: true }),
+          ])
+        ).start();
+      loop(orb1Y, 4000);
+      loop(orb2Y, 3500, 900);
+    });
+    return () => task.cancel();
+  }, []);
+
+  // Countdown timer
   useEffect(() => {
     if (countdown > 0 && resendDisabled) {
-      const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
-      return () => clearTimeout(timer);
+      const t = setTimeout(() => setCountdown(c => c - 1), 1000);
+      return () => clearTimeout(t);
     } else if (countdown === 0) {
       setResendDisabled(false);
     }
   }, [countdown, resendDisabled]);
 
-  // Handle OTP input change
-  const handleOtpChange = (value, index) => {
-    // Only allow numbers
-    if (!/^\d*$/.test(value)) return;
-    
-    const newOtp = [...otp];
-    newOtp[index] = value;
-    setOtp(newOtp);
-    
-    // Clear errors when user starts typing
-    if (errors.otp) {
-      setErrors({ ...errors, otp: null });
-    }
-    
-    // Auto-focus next input
-    if (value && index < 5) {
-      otpRefs[index + 1].current.focus();
-    }
+  const shakeCard = () => {
+    Animated.sequence([
+      Animated.timing(shakeX, { toValue: 10,  duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: -10, duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 7,   duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: -7,  duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 0,   duration: 55, useNativeDriver: true }),
+    ]).start();
   };
 
-  // Handle backspace
-  const handleKeyPress = (key, index) => {
-    if (key === 'Backspace' && !otp[index] && index > 0) {
-      otpRefs[index - 1].current.focus();
-    }
+  const handleOtpChange = (val, idx) => {
+    if (!/^\d*$/.test(val)) return;
+    const next = [...otp];
+    next[idx] = val;
+    setOtp(next);
+    if (errors.otp) setErrors(e => ({ ...e, otp: null }));
+    if (val && idx < 5) otpRefs[idx + 1].current?.focus();
   };
 
-  // Validate password
-  const validatePassword = (password) => {
-    return password.length >= 8;
+  const handleKeyPress = (key, idx) => {
+    if (key === 'Backspace' && !otp[idx] && idx > 0) otpRefs[idx - 1].current?.focus();
   };
 
-  // Form validation
-  const validateForm = () => {
-    const newErrors = {};
-
-    // Validate OTP
-    const otpString = otp.join('');
-    if (otpString.length !== 6) {
-      newErrors.otp = 'Please enter complete 6-digit OTP';
-    }
-
-    // Validate passwords
-    if (!newPassword.trim()) {
-      newErrors.newPassword = 'New password is required';
-    } else if (!validatePassword(newPassword)) {
-      newErrors.newPassword = 'Password must be at least 8 characters';
-    }
-
-    if (!confirmPassword.trim()) {
-      newErrors.confirmPassword = 'Please confirm your password';
-    } else if (newPassword !== confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+  const validate = () => {
+    const e = {};
+    if (otp.join('').length !== 6) e.otp = 'Please enter the complete 6-digit OTP';
+    if (!newPassword.trim()) e.newPassword = 'New password is required';
+    else if (newPassword.length < 8) e.newPassword = 'Minimum 8 characters required';
+    if (!confirmPassword.trim()) e.confirmPassword = 'Please confirm your password';
+    else if (newPassword !== confirmPassword) e.confirmPassword = 'Passwords do not match';
+    setErrors(e);
+    if (Object.keys(e).length) shakeCard();
+    return !Object.keys(e).length;
   };
 
-  // Handle OTP verification and password reset in one step
-  const handleVerifyOtp = async () => {
-    if (!validateForm()) {
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const otpString = otp.join('');
-      
-      // Call combined API to verify OTP and reset password
-      const response = await verifyOtpAPI(email, otpString, newPassword);
-      
-      // If we reach here, OTP was verified and password was reset successfully
-      Alert.alert(
-        'Password Reset Successful', 
-        response.message || 'Your password has been reset successfully! You can now login with your new password.',
-        [
-          {
-            text: 'Login Now',
-            onPress: () => navigation.navigate('Login')
-          }
-        ]
-      );
-    } catch (error) {
-      // Show only a user-friendly alert, avoid noisy console errors in production
-      Alert.alert('Error', error.message || 'Invalid OTP or failed to reset password. Please try again.');
-      // Clear OTP on error
-      setOtp(['', '', '', '', '', '']);
-      otpRefs[0].current.focus();
-    } finally {
-      setLoading(false);
-    }
+  const handleVerify = () => {
+    if (!validate()) return;
+    Animated.sequence([
+      Animated.timing(btnScale, { toValue: 0.95, duration: 80, useNativeDriver: true }),
+      Animated.timing(btnScale, { toValue: 1,    duration: 80, useNativeDriver: true }),
+    ]).start(async () => {
+      setLoading(true);
+      try {
+        const res = await verifyOtpAPI(email, otp.join(''), newPassword);
+        Alert.alert('Password Reset Successful', res.message || 'Your password has been reset. You can now sign in.', [
+          { text: 'Sign In', onPress: () => navigation.navigate('Login') },
+        ]);
+      } catch (err) {
+        Alert.alert('Error', err.message || 'Invalid OTP. Please try again.');
+        setOtp(['', '', '', '', '', '']);
+        otpRefs[0].current?.focus();
+      } finally {
+        setLoading(false);
+      }
+    });
   };
 
-  // Clear error when user starts typing
-  const handleNewPasswordChange = (text) => {
-    setNewPassword(text);
-    if (errors.newPassword) {
-      setErrors({ ...errors, newPassword: null });
-    }
-  };
-
-  const handleConfirmPasswordChange = (text) => {
-    setConfirmPassword(text);
-    if (errors.confirmPassword) {
-      setErrors({ ...errors, confirmPassword: null });
-    }
-  };
-
-  // Handle resend OTP
-  const handleResendOtp = async () => {
+  const handleResend = async () => {
     setResendDisabled(true);
     setCountdown(30);
-    
     try {
-      // Import and call the forgot password API again to resend OTP
-      const { forgotPasswordAPI } = require('../services/api');
-      const response = await forgotPasswordAPI(email);
-      Alert.alert('OTP Sent', response.message || 'New OTP has been sent to your email');
-    } catch (error) {
-      Alert.alert('Error', error.message || 'Failed to resend OTP. Please try again.');
+      const res = await forgotPasswordAPI(email);
+      Alert.alert('OTP Sent', res.message || 'A new OTP has been sent to your email.');
+    } catch (err) {
+      Alert.alert('Error', err.message || 'Failed to resend OTP.');
       setResendDisabled(false);
       setCountdown(0);
     }
   };
 
+  const orb1T = orb1Y.interpolate({ inputRange: [0, 1], outputRange: [0, 22] });
+  const orb2T = orb2Y.interpolate({ inputRange: [0, 1], outputRange: [0, -18] });
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={s.safe}>
       <StatusBar style="dark" />
-      <KeyboardAvoidingView 
-        style={styles.container} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <ScrollView 
-          contentContainerStyle={styles.scrollContainer}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* OTP Verification and Password Reset Form */}
-          <View style={styles.form}>
-            <Text style={styles.formTitle}>Verify OTP & Reset Password</Text>
-            
-            <Text style={styles.description}>
-              Enter the 6-digit code sent to {'\n'}
-              <Text style={styles.emailText}>{email}</Text>{'\n'}
-              and create your new password
-            </Text>
 
-            {/* OTP Input Boxes */}
-            <View style={styles.otpContainer}>
-              {otp.map((digit, index) => (
-                <TextInput
-                  key={index}
-                  ref={otpRefs[index]}
-                  style={[
-                    styles.otpInput,
-                    errors.otp && styles.otpInputError,
-                    digit && styles.otpInputFilled
-                  ]}
-                  value={digit}
-                  onChangeText={(value) => handleOtpChange(value, index)}
-                  onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, index)}
-                  keyboardType="numeric"
-                  maxLength={1}
-                  textAlign="center"
-                  selectTextOnFocus
-                  editable={!loading}
-                />
-              ))}
-            </View>
+      {/* Background Orbs */}
+      <View style={StyleSheet.absoluteFill} pointerEvents="none">
+        <Animated.View style={[s.orb1, { transform: [{ translateY: orb1T }] }]} />
+        <Animated.View style={[s.orb2, { transform: [{ translateY: orb2T }] }]} />
+        <View style={s.orb3} />
+      </View>
 
-            {errors.otp && <Text style={styles.errorText}>{errors.otp}</Text>}
-
-            {/* New Password Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>New Password</Text>
-              <View style={[styles.inputWrapper, errors.newPassword && styles.inputError]}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter new password"
-                  placeholderTextColor="#9ca3af"
-                  value={newPassword}
-                  onChangeText={handleNewPasswordChange}
-                  secureTextEntry={!showNewPassword}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={!loading}
-                />
-                <TouchableOpacity
-                  style={styles.eyeIcon}
-                  onPress={() => setShowNewPassword(!showNewPassword)}
-                  disabled={loading}
-                >
-                  <Ionicons 
-                    name={showNewPassword ? 'eye-outline' : 'eye-off-outline'} 
-                    size={22} 
-                    color="#a855f7" 
-                  />
-                </TouchableOpacity>
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <ScrollView
+            contentContainerStyle={s.scroll}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
+            {/* Back Button */}
+            <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
+              <View style={s.backCircle}>
+                <Ionicons name="arrow-back" size={20} color="#6C63FF" />
               </View>
-              {errors.newPassword && <Text style={styles.errorText}>{errors.newPassword}</Text>}
-            </View>
-
-            {/* Confirm Password Input */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Confirm Password</Text>
-              <View style={[styles.inputWrapper, errors.confirmPassword && styles.inputError]}>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Confirm new password"
-                  placeholderTextColor="#9ca3af"
-                  value={confirmPassword}
-                  onChangeText={handleConfirmPasswordChange}
-                  secureTextEntry={!showConfirmPassword}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  editable={!loading}
-                />
-                <TouchableOpacity
-                  style={styles.eyeIcon}
-                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-                  disabled={loading}
-                >
-                  <Ionicons 
-                    name={showConfirmPassword ? 'eye-outline' : 'eye-off-outline'} 
-                    size={22} 
-                    color="#a855f7" 
-                  />
-                </TouchableOpacity>
-              </View>
-              {errors.confirmPassword && <Text style={styles.errorText}>{errors.confirmPassword}</Text>}
-            </View>
-
-            {/* Reset Password Button */}
-            <TouchableOpacity
-              style={[styles.verifyButton, loading && styles.verifyButtonDisabled]}
-              onPress={handleVerifyOtp}
-              disabled={loading}
-            >
-              {loading ? (
-                <Text style={styles.verifyButtonText}>Resetting Password...</Text>
-              ) : (
-                <Text style={styles.verifyButtonText}>RESET PASSWORD</Text>
-              )}
             </TouchableOpacity>
 
-            {/* Resend OTP */}
-            <View style={styles.resendContainer}>
-              <Text style={styles.resendText}>Didn't receive code? </Text>
-              <TouchableOpacity 
-                onPress={handleResendOtp}
-                disabled={resendDisabled}
-              >
-                <Text style={[
-                  styles.resendLink, 
-                  resendDisabled && styles.resendLinkDisabled
-                ]}>
-                  {resendDisabled ? `Resend in ${countdown}s` : 'Resend OTP'}
-                </Text>
+            {/* Icon */}
+            <Animated.View style={[s.iconSection, { transform: [{ scale: iconScale }] }]}>
+              <View style={s.iconRing}>
+                <View style={s.iconCircle}>
+                  <Ionicons name="shield-checkmark-outline" size={34} color="#FFFFFF" />
+                </View>
+              </View>
+              <Text style={s.screenTitle}>Verify OTP</Text>
+              <Text style={s.screenSub}>Code sent to</Text>
+              <Text style={s.emailHighlight}>{email}</Text>
+            </Animated.View>
+
+            {/* Card */}
+            <Animated.View
+              style={[s.card, {
+                opacity: cardOpacity,
+                transform: [{ translateY: cardY }, { translateX: shakeX }],
+              }]}
+            >
+              {/* OTP Boxes */}
+              <Text style={s.sectionLabel}>Enter 6-digit OTP</Text>
+              <View style={s.otpRow}>
+                {otp.map((digit, idx) => (
+                  <OtpBox
+                    key={idx}
+                    value={digit}
+                    inputRef={otpRefs[idx]}
+                    onChangeText={(v) => handleOtpChange(v, idx)}
+                    onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, idx)}
+                    error={!!errors.otp}
+                    editable={!loading}
+                  />
+                ))}
+              </View>
+              {errors.otp && <Text style={s.errText}>{errors.otp}</Text>}
+
+              {/* Resend */}
+              <View style={s.resendRow}>
+                <Text style={s.resendInfo}>Didn't receive code? </Text>
+                <TouchableOpacity onPress={handleResend} disabled={resendDisabled} activeOpacity={0.7}>
+                  <Text style={[s.resendLink, resendDisabled && s.resendOff]}>
+                    {resendDisabled ? `Resend in ${countdown}s` : 'Resend OTP'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Divider */}
+              <View style={s.divRow}>
+                <View style={s.divLine} />
+                <Text style={s.divLabel}>NEW PASSWORD</Text>
+                <View style={s.divLine} />
+              </View>
+
+              {/* New Password */}
+              <FloatingInput
+                label="New Password"
+                icon="lock-closed-outline"
+                value={newPassword}
+                secureTextEntry={!showNew}
+                onChangeText={(t) => { setNewPassword(t); setErrors(e => ({ ...e, newPassword: null })); }}
+                error={errors.newPassword}
+                editable={!loading}
+                rightIcon={
+                  <TouchableOpacity onPress={() => setShowNew(v => !v)} disabled={loading} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name={showNew ? 'eye-outline' : 'eye-off-outline'} size={20} color="#A0AEC0" />
+                  </TouchableOpacity>
+                }
+              />
+
+              {/* Confirm Password */}
+              <FloatingInput
+                label="Confirm Password"
+                icon="lock-open-outline"
+                value={confirmPassword}
+                secureTextEntry={!showConfirm}
+                onChangeText={(t) => { setConfirmPassword(t); setErrors(e => ({ ...e, confirmPassword: null })); }}
+                error={errors.confirmPassword}
+                editable={!loading}
+                rightIcon={
+                  <TouchableOpacity onPress={() => setShowConfirm(v => !v)} disabled={loading} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                    <Ionicons name={showConfirm ? 'eye-outline' : 'eye-off-outline'} size={20} color="#A0AEC0" />
+                  </TouchableOpacity>
+                }
+              />
+
+              {/* Reset Button */}
+              <Animated.View style={{ transform: [{ scale: btnScale }], marginTop: 8 }}>
+                <TouchableOpacity
+                  style={[s.btn, loading && s.btnOff]}
+                  onPress={handleVerify}
+                  disabled={loading}
+                  activeOpacity={0.9}
+                >
+                  {loading ? (
+                    <ActivityIndicator color="#FFF" size="small" />
+                  ) : (
+                    <View style={s.btnInner}>
+                      <Text style={s.btnText}>Reset Password</Text>
+                      <View style={s.btnArrow}>
+                        <Ionicons name="checkmark" size={16} color="#6C63FF" />
+                      </View>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </Animated.View>
+
+              {/* Back to Login */}
+              <TouchableOpacity style={s.loginRow} onPress={() => navigation.navigate('Login')} activeOpacity={0.7}>
+                <Ionicons name="arrow-back-outline" size={15} color="#6C63FF" />
+                <Text style={s.loginText}> Back to Sign In</Text>
               </TouchableOpacity>
-            </View>
-
-            {/* Back to Login */}
-            <TouchableOpacity 
-              style={styles.backToLoginContainer}
-              onPress={() => navigation.navigate('Login')}
-            >
-              <Text style={styles.backToLoginText}>Back to Login</Text>
-            </TouchableOpacity>
-
-            {/* Password Requirements */}
-            <View style={styles.requirementsContainer}>
-              <Text style={styles.requirementsTitle}>Password must contain:</Text>
-              <Text style={styles.requirementText}>• At least 8 characters</Text>
-              <Text style={styles.requirementText}>• Mix of letters and numbers recommended</Text>
-            </View>
-
-            {/* Demo Info */}
-            <View style={styles.demoCredentials}>
-              <Text style={styles.demoTitle}>Important:</Text>
-              <Text style={styles.demoText}>Enter the 6-digit OTP sent to your email</Text>
-              <Text style={styles.demoText}>Check your email inbox and spam folder</Text>
-            </View>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+            </Animated.View>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </TouchableWithoutFeedback>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#f3e8ff', // Light purple background
+const s = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: '#F0EEFF' },
+
+  orb1: {
+    position: 'absolute', width: width * 0.75, height: width * 0.75,
+    borderRadius: width * 0.375, backgroundColor: 'rgba(108, 99, 255, 0.13)',
+    top: -width * 0.22, left: -width * 0.18,
   },
-  container: {
-    flex: 1,
-    backgroundColor: '#f3e8ff', // Light purple background
+  orb2: {
+    position: 'absolute', width: width * 0.55, height: width * 0.55,
+    borderRadius: width * 0.275, backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    bottom: height * 0.08, right: -width * 0.12,
   },
-  scrollContainer: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 30,
-    minHeight: height - 100,
+  orb3: {
+    position: 'absolute', width: width * 0.32, height: width * 0.32,
+    borderRadius: width * 0.16, backgroundColor: 'rgba(236, 72, 153, 0.07)',
+    top: height * 0.38, right: -width * 0.06,
   },
-  form: {
-    backgroundColor: '#ffffff',
-    borderRadius: 20,
-    padding: 24,
-    marginHorizontal: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+
+  scroll: {
+    flexGrow: 1, paddingHorizontal: 22, paddingVertical: 28, minHeight: height - 80,
   },
-  formTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#7c3aed',
-    textAlign: 'center',
-    marginBottom: 16,
+
+  backBtn: { marginBottom: 8 },
+  backCircle: {
+    width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15, shadowRadius: 6, elevation: 4,
   },
-  description: {
-    fontSize: 14,
-    color: '#6b7280',
-    textAlign: 'center',
-    marginBottom: 32,
-    lineHeight: 20,
+
+  iconSection: { alignItems: 'center', marginBottom: 24, marginTop: 8 },
+  iconRing: {
+    width: 92, height: 92, borderRadius: 46,
+    backgroundColor: 'rgba(108, 99, 255, 0.15)',
+    justifyContent: 'center', alignItems: 'center', marginBottom: 12,
   },
-  emailText: {
-    fontWeight: '600',
-    color: '#374151',
+  iconCircle: {
+    width: 72, height: 72, borderRadius: 36, backgroundColor: '#6C63FF',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4, shadowRadius: 16, elevation: 12,
   },
-  otpContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 24,
+  screenTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A2E', marginBottom: 4 },
+  screenSub: { fontSize: 13.5, color: '#718096' },
+  emailHighlight: { fontSize: 14, fontWeight: '700', color: '#6C63FF', marginTop: 2 },
+
+  card: {
+    backgroundColor: '#FFFFFF', borderRadius: 26, padding: 24,
+    shadowColor: '#4C1D95', shadowOffset: { width: 0, height: 14 },
+    shadowOpacity: 0.13, shadowRadius: 28, elevation: 12,
   },
-  otpInput: {
-    width: 45,
-    height: 45,
-    borderWidth: 2,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
-    backgroundColor: '#f9fafb',
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
+
+  sectionLabel: { fontSize: 14, fontWeight: '600', color: '#4A5568', marginBottom: 14 },
+
+  otpRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
+
+  errText: { fontSize: 12, color: '#EF4444', textAlign: 'center', marginBottom: 10 },
+
+  resendRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 20, marginTop: 4 },
+  resendInfo: { fontSize: 13, color: '#718096' },
+  resendLink: { fontSize: 13, color: '#6C63FF', fontWeight: '700' },
+  resendOff: { color: '#A0AEC0' },
+
+  divRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
+  divLine: { flex: 1, height: 1, backgroundColor: '#EDF2F7' },
+  divLabel: { fontSize: 10, color: '#CBD5E0', marginHorizontal: 10, letterSpacing: 1.2, fontWeight: '600' },
+
+  btn: {
+    backgroundColor: '#6C63FF', borderRadius: 14, height: 56,
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.38, shadowRadius: 14, elevation: 8, marginBottom: 18,
   },
-  otpInputFilled: {
-    borderColor: '#7c3aed',
-    backgroundColor: '#f3e8ff',
+  btnOff: { backgroundColor: '#C4C4C4', shadowColor: 'transparent', elevation: 0 },
+  btnInner: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  btnText: { fontSize: 16, fontWeight: '700', color: '#FFF', letterSpacing: 0.3 },
+  btnArrow: {
+    width: 28, height: 28, borderRadius: 14, backgroundColor: '#FFF',
+    justifyContent: 'center', alignItems: 'center',
   },
-  otpInputError: {
-    borderColor: '#ef4444',
-    backgroundColor: '#fef2f2',
-  },
-  errorText: {
-    fontSize: 12,
-    color: '#ef4444',
-    textAlign: 'center',
-    marginTop: -16,
-    marginBottom: 16,
-  },
-  verifyButton: {
-    backgroundColor: '#7c3aed',
-    borderRadius: 12,
-    height: 54,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-    shadowColor: '#7c3aed',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  verifyButtonDisabled: {
-    backgroundColor: '#d1d5db',
-    shadowColor: 'transparent',
-    elevation: 0,
-  },
-  verifyButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#ffffff',
-    letterSpacing: 1,
-  },
-  resendContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  resendText: {
-    fontSize: 14,
-    color: '#6b7280',
-  },
-  resendLink: {
-    fontSize: 14,
-    color: '#7c3aed',
-    fontWeight: '600',
-  },
-  resendLinkDisabled: {
-    color: '#9ca3af',
-  },
-  backToLoginContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  backToLoginText: {
-    fontSize: 14,
-    color: '#6b7280',
-    textDecorationLine: 'underline',
-  },
-  demoCredentials: {
-    backgroundColor: '#f0f9ff',
-    borderRadius: 8,
-    padding: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#7c3aed',
-  },
-  demoTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 4,
-  },
-  demoText: {
-    fontSize: 11,
-    color: '#6b7280',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-  },
-  // New styles for password inputs
-  inputContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  inputWrapper: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 12,
-    backgroundColor: '#f9fafb',
-    paddingHorizontal: 16,
-    height: 48,
-  },
-  inputError: {
-    borderColor: '#ef4444',
-    backgroundColor: '#fef2f2',
-  },
-  input: {
-    flex: 1,
-    fontSize: 16,
-    color: '#374151',
-    paddingVertical: 0,
-  },
-  eyeIcon: {
-    padding: 8,
-  },
-  requirementsContainer: {
-    backgroundColor: '#f8f9fa',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
-  },
-  requirementsTitle: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 6,
-  },
-  requirementText: {
-    fontSize: 11,
-    color: '#6b7280',
-    marginBottom: 2,
-  },
+
+  loginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  loginText: { fontSize: 14, color: '#6C63FF', fontWeight: '600' },
 });
