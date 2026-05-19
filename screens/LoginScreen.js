@@ -16,6 +16,7 @@ import {
   Keyboard,
   InteractionManager,
 } from 'react-native';
+import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -41,14 +42,11 @@ export default function LoginScreen({ navigation }) {
   const cardOpacity = useRef(new Animated.Value(0)).current;
   const btnScale    = useRef(new Animated.Value(1)).current;
   const shakeX      = useRef(new Animated.Value(0)).current;
-  const orb1Y       = useRef(new Animated.Value(0)).current;
-  const orb2Y       = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadSaved();
     const task = InteractionManager.runAfterInteractions(() => {
       runEntrance();
-      floatOrbs();
     });
     return () => task.cancel();
   }, []);
@@ -62,19 +60,7 @@ export default function LoginScreen({ navigation }) {
     ]).start();
   };
 
-  const floatOrbs = () => {
-    const loop = (anim, dur, delay = 0) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(anim, { toValue: 1, duration: dur, delay, useNativeDriver: true }),
-          Animated.timing(anim, { toValue: 0, duration: dur, useNativeDriver: true }),
-        ])
-      ).start();
-    loop(orb1Y, 4000);
-    loop(orb2Y, 3500, 800);
-  };
-
-  const shakeCard = () => {
+const shakeCard = () => {
     Animated.sequence([
       Animated.timing(shakeX, { toValue: 10,  duration: 55, useNativeDriver: true }),
       Animated.timing(shakeX, { toValue: -10, duration: 55, useNativeDriver: true }),
@@ -139,18 +125,49 @@ export default function LoginScreen({ navigation }) {
     });
   };
 
-  const orb1Trans = orb1Y.interpolate({ inputRange: [0, 1], outputRange: [0, 22] });
-  const orb2Trans = orb2Y.interpolate({ inputRange: [0, 1], outputRange: [0, -18] });
-
   return (
     <SafeAreaView style={s.safe}>
       <StatusBar style="dark" />
 
-      {/* ── Background Orbs ── */}
+      {/* ── Background SVG Waves ── */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Animated.View style={[s.orb1, { transform: [{ translateY: orb1Trans }] }]} />
-        <Animated.View style={[s.orb2, { transform: [{ translateY: orb2Trans }] }]} />
-        <View style={s.orb3} />
+        {/* Top wave */}
+        <Svg width={width} height={320} viewBox={`0 0 ${width} 320`} style={{ position: 'absolute', top: 0 }}>
+          <Defs>
+            <LinearGradient id="waveGrad1" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0%" stopColor="#6C63FF" stopOpacity="0.22" />
+              <Stop offset="100%" stopColor="#48CAE4" stopOpacity="0.12" />
+            </LinearGradient>
+            <LinearGradient id="waveGrad2" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0%" stopColor="#6C63FF" stopOpacity="0.12" />
+              <Stop offset="100%" stopColor="#48CAE4" stopOpacity="0.06" />
+            </LinearGradient>
+          </Defs>
+          {/* Wave layer 1 */}
+          <Path
+            d={`M0,0 L${width},0 L${width},180 Q${width * 0.75},240 ${width * 0.5},200 Q${width * 0.25},160 0,220 Z`}
+            fill="url(#waveGrad1)"
+          />
+          {/* Wave layer 2 */}
+          <Path
+            d={`M0,0 L${width},0 L${width},140 Q${width * 0.75},200 ${width * 0.5},165 Q${width * 0.25},130 0,180 Z`}
+            fill="url(#waveGrad2)"
+          />
+        </Svg>
+
+        {/* Bottom wave */}
+        <Svg width={width} height={200} viewBox={`0 0 ${width} 200`} style={{ position: 'absolute', bottom: 0 }}>
+          <Defs>
+            <LinearGradient id="waveGrad3" x1="0" y1="1" x2="1" y2="0">
+              <Stop offset="0%" stopColor="#48CAE4" stopOpacity="0.10" />
+              <Stop offset="100%" stopColor="#6C63FF" stopOpacity="0.06" />
+            </LinearGradient>
+          </Defs>
+          <Path
+            d={`M0,200 L${width},200 L${width},80 Q${width * 0.75},20 ${width * 0.5},60 Q${width * 0.25},100 0,40 Z`}
+            fill="url(#waveGrad3)"
+          />
+        </Svg>
       </View>
 
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -260,36 +277,8 @@ export default function LoginScreen({ navigation }) {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F0EEFF' },
+  safe: { flex: 1, backgroundColor: '#FFFFFF' },
 
-  // Orbs
-  orb1: {
-    position: 'absolute',
-    width: width * 0.75,
-    height: width * 0.75,
-    borderRadius: width * 0.375,
-    backgroundColor: 'rgba(108, 99, 255, 0.13)',
-    top: -width * 0.22,
-    left: -width * 0.18,
-  },
-  orb2: {
-    position: 'absolute',
-    width: width * 0.55,
-    height: width * 0.55,
-    borderRadius: width * 0.275,
-    backgroundColor: 'rgba(59, 130, 246, 0.1)',
-    bottom: height * 0.08,
-    right: -width * 0.12,
-  },
-  orb3: {
-    position: 'absolute',
-    width: width * 0.32,
-    height: width * 0.32,
-    borderRadius: width * 0.16,
-    backgroundColor: 'rgba(236, 72, 153, 0.07)',
-    top: height * 0.38,
-    right: -width * 0.06,
-  },
 
   // Scroll
   scroll: {
