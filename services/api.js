@@ -1,7 +1,194 @@
-//import jwtDecode from "jwt-decode";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-// API Service for Student Login App
-const API_BASE_URL = "http://192.168.29.216/iimt-application/api/portal/";
+const API_BASE_URL = "https://students.dhavalhost.com/api/portal/";
+
+const getAuthToken = async () => {
+  try {
+    return await AsyncStorage.getItem("userToken");
+  } catch (error) {
+    console.error("Error getting auth token:", error);
+    return null;
+  }
+};
+
+const formatDateDisplay = (dateString) => {
+  if (!dateString) return "N/A";
+  try {
+    return new Date(dateString).toLocaleDateString("en-GB");
+  } catch {
+    return dateString;
+  }
+};
+
+// ─── Dashboard API ──────────────────────────────────────────────────────────
+
+export const getDashboardData = async () => {
+  try {
+    const token = await getAuthToken();
+    if (!token) throw new Error("Authentication token not found");
+
+    const response = await fetch(`${API_BASE_URL}/active-membership`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+    const data = await response.json();
+    if (data.status !== 200) throw new Error(data.message || "API returned error status");
+
+    const subscriptions = {};
+    if (data.res && Array.isArray(data.res)) {
+      data.res.forEach((item, index) => {
+        try {
+          const utilityDetails = JSON.parse(item.utility_details);
+          subscriptions[index] = {
+            id: item.id,
+            name: item.name,
+            endDate: formatDateDisplay(item.end_date),
+            startDate: formatDateDisplay(item.start_date),
+            amount: item.amount,
+            status: item.payment_status === "1" ? "active" : "inactive",
+            paymentStatus: item.payment_status,
+            months: utilityDetails.months || "N/A",
+            subUtility: utilityDetails.sub_utility || "N/A",
+            membershipType: utilityDetails.membership_type || "N/A",
+            remark: item.remark,
+            createdOn: formatDateDisplay(item.created_on),
+            editedOn: formatDateDisplay(item.edited_on),
+          };
+        } catch (parseError) {
+          console.warn("Error parsing utility details for item:", item.id, parseError);
+          subscriptions[`utility_${item.id}`] = {
+            id: item.id,
+            name: item.name || "Unknown Utility",
+            endDate: formatDateDisplay(item.end_date),
+            startDate: formatDateDisplay(item.start_date),
+            amount: item.amount,
+            status: item.payment_status === "1" ? "active" : "inactive",
+            paymentStatus: item.payment_status,
+          };
+        }
+      });
+    }
+
+    return {
+      grievance: data.grievance || 0,
+      ticket: data.tickets || 0,
+      utility: data.active_utility || 0,
+      subscriptions,
+      success: true,
+      message: data.message || "Dashboard data loaded successfully",
+      lastUpdated: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error("Error fetching dashboard data:", error);
+    return {
+      grievance: 0,
+      ticket: 0,
+      utility: 0,
+      subscriptions: { fallback: { name: "No Active Subscriptions", endDate: "N/A", status: "inactive" } },
+      success: false,
+      message: error.message || "Failed to load dashboard data",
+      lastUpdated: new Date().toISOString(),
+    };
+  }
+};
+
+export const refreshMetricData = async (metric = "all") => {
+  try {
+    const freshData = await getDashboardData();
+    if (metric === "all") return freshData;
+    return {
+      [metric]: freshData[metric],
+      lastUpdated: freshData.lastUpdated,
+      success: freshData.success,
+      message: `${metric} data refreshed successfully`,
+    };
+  } catch (error) {
+    console.error(`Error refreshing ${metric} data:`, error);
+    throw new Error(`Failed to refresh ${metric} data`);
+  }
+};
+
+export const getSubscriptionData = async () => {
+  try {
+    const dashboardData = await getDashboardData();
+    const currentDate = new Date();
+    const subscriptions = { ...dashboardData.subscriptions };
+
+    Object.keys(subscriptions).forEach((key) => {
+      try {
+        const endDate = new Date(subscriptions[key].endDate);
+        if (!isNaN(endDate.getTime())) {
+          const daysRemaining = Math.ceil((endDate - currentDate) / (1000 * 60 * 60 * 24));
+          subscriptions[key].daysRemaining = daysRemaining;
+          subscriptions[key].isExpiringSoon = daysRemaining <= 30;
+          subscriptions[key].isExpired = daysRemaining < 0;
+        } else {
+          subscriptions[key].daysRemaining = 0;
+          subscriptions[key].isExpiringSoon = false;
+          subscriptions[key].isExpired = true;
+        }
+      } catch (dateError) {
+        console.warn("Error calculating days for subscription:", key, dateError);
+        subscriptions[key].daysRemaining = 0;
+        subscriptions[key].isExpiringSoon = false;
+        subscriptions[key].isExpired = true;
+      }
+    });
+
+    return { subscriptions, success: dashboardData.success, message: "Subscription data loaded successfully" };
+  } catch (error) {
+    console.error("Error fetching subscription data:", error);
+    throw new Error("Failed to load subscription data");
+  }
+};
+
+export const submitRequest = async (type, requestData = {}) => {
+  try {
+    const token = await getAuthToken();
+    if (!token) throw new Error("Authentication token not found");
+    return {
+      success: true,
+      message: `${type} submitted successfully`,
+      requestId: `REQ-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+      submittedAt: new Date().toISOString(),
+    };
+  } catch (error) {
+    console.error(`Error submitting ${type}:`, error);
+    throw new Error(`Failed to submit ${type}`);
+  }
+};
+
+export const subscribeToUpdates = (callback) => {
+  const interval = setInterval(async () => {
+    try {
+      const freshData = await getDashboardData();
+      callback(freshData);
+    } catch (error) {
+      console.error("Error in subscription update:", error);
+    }
+  }, 30000);
+  return () => clearInterval(interval);
+};
+
+export const testApiConnection = async () => {
+  try {
+    const data = await getDashboardData();
+    return {
+      success: data.success,
+      message: data.success ? "API connection successful" : "API returned error",
+      data,
+    };
+  } catch (error) {
+    return { success: false, message: `API connection failed: ${error.message}`, error: error.message };
+  }
+};
 
 // Read User API
 export const readUserAPI = async (token) => {
@@ -1485,50 +1672,6 @@ export const getHelpdeskTicketsAPI = async (token, page = 0, limit = 10) => {
     throw new Error(error.message || "Failed to fetch helpdesk tickets");
   }
 };
-
-//// export const decodetoken = async () => {
-//   // Example JWT token (from your login API)
-//   const token =
-//     "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJsb2NhbGhvc3QiLCJhdWQiOiJsb2NhbGhvc3QiLCJpYXQiOjE3NTY3ODc5ODMsImV4cCI6MTc2MTk3MTk4Mywic3ViIjoiNyIsImp0aSI6IjM3NmE1NmE0YmM5ZjQ4OGYiLCJkYXRhIjp7ImlkIjoiNyIsIm5hbWUiOiJSYWh1bCBWIiwiZW1haWwiOiJ5YWRhdnNhbmRlZXBAZGFydGV3ZWIuaW4iLCJtb2JpbGUiOiIxMjM0NTY3ODk2IiwiZG9iIjpudWxsfX0.eSvygQojgEy9kInfX4n6kukT4hoMoYxlPcGnd-Lytr0";
-
-//     const secret = "xyz"; // ❌ not safe in frontend!
-
-//     try {
-//       const decoded = jwt.verify(token, secret);
-//       console.log("Decoded:", decoded);
-//     } catch (err) {
-//       console.error("Token invalid:", err.message);
-//     }
-// };
-
-// export const getutilitylist = async (token) => {
-//   try {
-//     const response = await fetch(`${API_BASE_URL}/dashboard`, {
-//       method: "POST",
-//       headers: {
-//         Authorization: `Bearer ${token}`,
-//         "Content-Type": "application/json",
-//       },
-//     });
-
-//     const data = await response.json();
-
-//     if (!response.ok || (data.status !== 200 && data.status !== 201)) {
-//       throw new Error(data.message || "Failed to fetch categories");
-//     }
-
-//     console.log("kjljolkkp", data.res.utility_list);
-
-//     return {
-//       success: true,
-//       utility_list: data.res.utility_list[0],
-//       message: data.message || "Categories fetched successfully",
-//     };
-//   } catch (error) {
-//     console.error("Get Categories Error:", error);
-//     throw new Error(error.message || "Failed to fetch categories");
-//   }
-// };
 // Get Course & Placement Fee API
 export const getCourseAndPlacementFeeAPI = async (token) => {
   try {

@@ -19,8 +19,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getDashboardData } from "../services/dashboardApi";
-import { logoutAPI, readUserAPI } from "../services/api";
+import { getDashboardData, logoutAPI, readUserAPI } from "../services/api";
 import { useTheme } from "../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
