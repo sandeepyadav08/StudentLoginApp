@@ -860,9 +860,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 15,
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    backgroundColor: "#f3e8ff",
+    borderBottomWidth: 0,
   },
   backButton: {
     padding: 8,

@@ -179,8 +179,8 @@ export default function SettingsScreen({ navigation }) {
           style={[
             styles.header,
             {
-              backgroundColor: colors.surface,
-              borderBottomColor: colors.border,
+              backgroundColor: colors.background,
+              borderBottomColor: "transparent",
               paddingHorizontal: getResponsivePadding(16, screenWidth),
               paddingVertical: getResponsivePadding(15, screenWidth),
             },
@@ -329,8 +329,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 15,
-    borderBottomWidth: 1,
-    marginTop: Platform.OS === 'android' ? 0 : 0,
   },
   backButton: {
     padding: 8,

@@ -5,7 +5,6 @@ import {
   View,
   TouchableOpacity,
   ScrollView,
-  Alert,
   RefreshControl,
   Modal,
   Animated,
@@ -19,7 +18,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { getDashboardData, logoutAPI, readUserAPI } from "../services/api";
+import { getDashboardData, readUserAPI } from "../services/api";
 import { useTheme } from "../contexts/ThemeContext";
 
 const { width } = Dimensions.get("window");
@@ -48,13 +47,13 @@ export default function DashboardScreen({ navigation }) {
     subscriptions: {},
   });
   const [userName, setUserName] = useState("Student");
+  const [userEmail, setUserEmail] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [drawerVisible, setDrawerVisible] = useState(false);
   const [drawerAnimation] = useState(new Animated.Value(-screenWidth * 0.8));
   const [isDrawerAnimating, setIsDrawerAnimating] = useState(false);
-  const [isNavigating, setIsNavigating] = useState(false);
   const [utilitySubmenuOpen, setUtilitySubmenuOpen] = useState(false);
   const isMounted = useRef(true);
 
@@ -72,15 +71,19 @@ export default function DashboardScreen({ navigation }) {
   const loadUserData = async () => {
     try {
       const token = await AsyncStorage.getItem("userToken");
+      const storedEmail = await AsyncStorage.getItem("userEmail");
+      if (storedEmail) setUserEmail(storedEmail);
       if (token) {
         const userData = await readUserAPI(token);
         if (userData.success && userData.user?.name) {
           setUserName(userData.user.name);
         }
+        if (userData.success && userData.user?.email) {
+          setUserEmail(userData.user.email);
+        }
       }
     } catch (error) {
       console.error("User data load error:", error);
-      // Keep default "Student" if API fails
     }
   };
 
@@ -190,49 +193,6 @@ export default function DashboardScreen({ navigation }) {
         }
       });
     }
-  };
-
-  const handleLogout = async () => {
-    if (isNavigating) return;
-
-    Alert.alert("Logout", "Are you sure you want to logout?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Logout",
-        onPress: async () => {
-          setIsNavigating(true);
-          try {
-            const token = await AsyncStorage.getItem("userToken");
-            if (token) {
-              await logoutAPI(token);
-            }
-            await AsyncStorage.removeItem("userToken");
-            await AsyncStorage.removeItem("userEmail");
-            navigation.replace("Login");
-          } catch (error) {
-            console.error("Logout error:", error);
-            // Even if API fails, clear local storage and navigate to login
-            await AsyncStorage.removeItem("userToken");
-            await AsyncStorage.removeItem("userEmail");
-            navigation.replace("Login");
-          }
-        },
-      },
-    ]);
-  };
-
-  const handleDataNavigation = () => {
-    if (isNavigating) return;
-    setIsNavigating(true);
-
-    navigation.navigate("DataTabs");
-
-    // Reset navigation flag after a brief delay
-    setTimeout(() => {
-      if (isMounted.current) {
-        setIsNavigating(false);
-      }
-    }, 1000);
   };
 
   const StatCard = ({ title, count, color, icon }) => {
@@ -388,8 +348,8 @@ export default function DashboardScreen({ navigation }) {
           style={[
             styles.header,
             {
-              backgroundColor: colors.surface,
-              borderBottomColor: colors.border,
+              backgroundColor: colors.background,
+              borderBottomColor: "transparent",
               paddingHorizontal: getResponsivePadding(16, screenWidth),
               paddingVertical: getResponsivePadding(15, screenWidth),
             },
@@ -439,9 +399,9 @@ export default function DashboardScreen({ navigation }) {
             <Text
               style={[
                 styles.welcomeTitle,
-                { 
+                {
                   color: colors.onPrimary,
-                  fontSize: getResponsiveSize(24, screenWidth) 
+                  fontSize: getResponsiveSize(18, screenWidth)
                 },
               ]}
             >
@@ -450,9 +410,9 @@ export default function DashboardScreen({ navigation }) {
             <Text
               style={[
                 styles.welcomeSubtitle,
-                { 
+                {
                   color: colors.primaryContainer,
-                  fontSize: getResponsiveSize(14, screenWidth) 
+                  fontSize: getResponsiveSize(14, screenWidth)
                 },
               ]}
             >
@@ -464,9 +424,9 @@ export default function DashboardScreen({ navigation }) {
                 <Text
                   style={[
                     styles.errorText,
-                    { 
+                    {
                       color: colors.error,
-                      fontSize: getResponsiveSize(12, screenWidth) 
+                      fontSize: getResponsiveSize(12, screenWidth)
                     },
                   ]}
                 >
@@ -482,7 +442,7 @@ export default function DashboardScreen({ navigation }) {
               styles.statsContainer,
               {
                 paddingHorizontal: getResponsivePadding(16, screenWidth),
-                marginBottom: getResponsivePadding(24, screenWidth),
+                marginBottom: getResponsivePadding(12, screenWidth),
               },
             ]}
           >
@@ -602,80 +562,6 @@ export default function DashboardScreen({ navigation }) {
             )}
           </View>
         </ScrollView>
-
-        {/* Bottom Navigation */}
-        <View
-          style={[
-            styles.bottomNavigation,
-            { 
-              backgroundColor: colors.surface,
-              borderTopColor: colors.border,
-              paddingBottom: insets.bottom > 0 ? insets.bottom : 8
-            },
-          ]}
-        >
-          <TouchableOpacity style={styles.navItem}>
-            <Ionicons
-              name="home"
-              size={getResponsiveSize(22, screenWidth)}
-              color={colors.primary}
-            />
-            <Text
-              style={[styles.navText, { 
-                color: colors.primary,
-                fontSize: getResponsiveSize(10, screenWidth)
-              }]}
-            >
-              Home
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.navItem}
-            onPress={handleDataNavigation}
-            disabled={isNavigating || isDrawerAnimating}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="receipt-outline"
-              size={getResponsiveSize(22, screenWidth)}
-              color={colors.textTertiary}
-            />
-            <Text
-              style={[
-                styles.navText,
-                { 
-                  color: colors.textTertiary,
-                  fontSize: getResponsiveSize(10, screenWidth)
-                }
-              ]}
-            >
-              Payment
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.navItem}
-            onPress={handleLogout}
-            disabled={isNavigating || isDrawerAnimating}
-            activeOpacity={0.7}
-          >
-            <Ionicons
-              name="log-out-outline"
-              size={getResponsiveSize(22, screenWidth)}
-              color={colors.textTertiary}
-            />
-            <Text
-              style={[
-                styles.navText,
-                { 
-                  color: colors.textTertiary,
-                  fontSize: getResponsiveSize(10, screenWidth)
-                }
-              ]}
-            >
-              Logout
-            </Text>
-          </TouchableOpacity>
-        </View>
 
         {/* Drawer Modal */}
         <Modal
@@ -871,22 +757,22 @@ const styles = StyleSheet.create({
   },
   welcomeSection: {
     margin: 16,
-    padding: 20,
+    padding: 14,
     borderRadius: 16,
   },
   welcomeTitle: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: "bold",
     marginBottom: 4,
   },
   welcomeSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
   },
   statsContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    marginBottom: 24,
+    marginBottom: 12,
   },
   statCard: {
     width: "31%",
@@ -994,21 +880,6 @@ const styles = StyleSheet.create({
   loadingText: {
     fontSize: 14,
     fontStyle: "italic",
-  },
-  bottomNavigation: {
-    flexDirection: "row",
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderTopWidth: 1,
-  },
-  navItem: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 6,
-  },
-  navText: {
-    marginTop: 3,
-    fontWeight: "500",
   },
   drawerOverlay: {
     flex: 1,

@@ -11,7 +11,7 @@ import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import LoginScreen from "./screens/LoginScreen";
 import ForgotPasswordScreen from "./screens/ForgotPasswordScreen";
 import OtpVerificationScreen from "./screens/OtpVerificationScreen";
-import DashboardScreen from "./screens/DashboardScreen";
+import BottomTabNavigator from "./navigators/BottomTabNavigator";
 import DataTabNavigator from "./screens/DataTabNavigator";
 import HelpdeskScreen from "./screens/HelpdeskScreen";
 import HelpdeskFormScreen from "./screens/HelpdeskFormScreen";
@@ -107,7 +107,7 @@ function AppNavigator() {
         />
         <Stack.Screen
           name="Dashboard"
-          component={DashboardScreen}
+          component={BottomTabNavigator}
           options={{ cardStyle: { backgroundColor: colors.background } }}
         />
         <Stack.Screen

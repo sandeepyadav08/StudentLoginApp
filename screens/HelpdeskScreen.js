@@ -248,7 +248,7 @@ const HelpdeskScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar style={isDark ? "light" : "dark"} />
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: "transparent" }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.backButton}
@@ -332,7 +332,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 15,
-    borderBottomWidth: 1,
   },
   backButton: {
     padding: 8,

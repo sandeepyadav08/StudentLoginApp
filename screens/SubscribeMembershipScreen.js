@@ -661,8 +661,8 @@ export default function SubscribeMembershipScreen({ navigation }) {
         style={[
           styles.header,
           {
-            backgroundColor: colors.surface,
-            borderBottomColor: colors.border,
+            backgroundColor: colors.background,
+            borderBottomColor: "transparent",
             paddingHorizontal: getResponsivePadding(16, screenWidth),
             paddingVertical: getResponsivePadding(15, screenWidth),
           },
@@ -1375,12 +1375,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    borderBottomWidth: 1,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
   backButton: {
     padding: 8,

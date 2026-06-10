@@ -496,8 +496,8 @@ export default function PaymentHistoryScreen({ navigation }) {
             style={[
               styles.header,
               {
-                backgroundColor: colors.surface,
-                borderBottomColor: colors.border,
+                backgroundColor: colors.background,
+                borderBottomColor: "transparent",
                 paddingHorizontal: getResponsivePadding(16, screenWidth),
                 paddingVertical: getResponsivePadding(15, screenWidth),
               },
@@ -551,8 +551,8 @@ export default function PaymentHistoryScreen({ navigation }) {
           style={[
             styles.header,
             {
-              backgroundColor: colors.surface,
-              borderBottomColor: colors.border,
+              backgroundColor: colors.background,
+              borderBottomColor: "transparent",
               paddingHorizontal: getResponsivePadding(16, screenWidth),
               paddingVertical: getResponsivePadding(15, screenWidth),
             },
@@ -567,9 +567,9 @@ export default function PaymentHistoryScreen({ navigation }) {
           <Text
             style={[
               styles.headerTitle,
-              { 
+              {
                 color: colors.primary,
-                fontSize: getResponsiveSize(18, screenWidth) 
+                fontSize: getResponsiveSize(18, screenWidth)
               },
             ]}
           >
@@ -588,9 +588,8 @@ export default function PaymentHistoryScreen({ navigation }) {
           style={{
             paddingHorizontal: 16,
             paddingVertical: 10,
-            backgroundColor: colors.surface,
-            borderBottomWidth: 1,
-            borderBottomColor: colors.border,
+            backgroundColor: colors.background,
+            borderBottomWidth: 0,
             zIndex: 1000,
           }}
         >
@@ -737,7 +736,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    borderBottomWidth: 1,
     paddingHorizontal: 16,
     paddingVertical: 15,
   },
