@@ -12,6 +12,7 @@ import LoginScreen from "./screens/LoginScreen";
 import ForgotPasswordScreen from "./screens/ForgotPasswordScreen";
 import OtpVerificationScreen from "./screens/OtpVerificationScreen";
 import BottomTabNavigator from "./navigators/BottomTabNavigator";
+import DrawerNavigator from "./navigators/DrawerNavigator";
 import DataTabNavigator from "./screens/DataTabNavigator";
 import HelpdeskScreen from "./screens/HelpdeskScreen";
 import HelpdeskFormScreen from "./screens/HelpdeskFormScreen";
@@ -107,7 +108,7 @@ function AppNavigator() {
         />
         <Stack.Screen
           name="Dashboard"
-          component={BottomTabNavigator}
+          component={DrawerNavigator}
           options={{ cardStyle: { backgroundColor: colors.background } }}
         />
         <Stack.Screen

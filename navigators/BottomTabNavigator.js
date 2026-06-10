@@ -1,3 +1,4 @@
+import { useNavigation } from "@react-navigation/native";
 import { useRef } from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Platform, Alert } from "react-native";
@@ -13,10 +14,11 @@ const Tab = createBottomTabNavigator();
 
 const LogoutComponent = () => null;
 
-const BottomTabNavigator = ({ navigation }) => {
+const BottomTabNavigator = () => {
   const lastPressRef = useRef(0);
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
+  const navigation = useNavigation();
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [

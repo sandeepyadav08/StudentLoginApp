@@ -6,15 +6,10 @@ import {
   TouchableOpacity,
   ScrollView,
   RefreshControl,
-  Modal,
-  Animated,
   Dimensions,
   Platform,
 } from "react-native";
-import {
-  useSafeAreaInsets,
-  SafeAreaView,
-} from "react-native-safe-area-context";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -36,7 +31,6 @@ const getResponsivePadding = (basePadding, screenWidth) => {
 };
 
 export default function DashboardScreen({ navigation }) {
-  const insets = useSafeAreaInsets();
   const { width: screenWidth, height: screenHeight } = Dimensions.get("window");
   const { colors, isDark, resetThemeToLight } = useTheme();
 
@@ -51,9 +45,6 @@ export default function DashboardScreen({ navigation }) {
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [drawerVisible, setDrawerVisible] = useState(false);
-  const [drawerAnimation] = useState(new Animated.Value(-screenWidth * 0.8));
-  const [isDrawerAnimating, setIsDrawerAnimating] = useState(false);
   const [utilitySubmenuOpen, setUtilitySubmenuOpen] = useState(false);
   const isMounted = useRef(true);
 
@@ -114,84 +105,13 @@ export default function DashboardScreen({ navigation }) {
   };
 
   const toggleDrawer = () => {
-    // Prevent multiple rapid calls during animation
-    if (isDrawerAnimating) return;
-
-    setIsDrawerAnimating(true);
-
-    if (drawerVisible) {
-      // Close drawer
-      Animated.timing(drawerAnimation, {
-        toValue: -screenWidth * 0.8,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => {
-        if (isMounted.current) {
-          setDrawerVisible(false);
-          setIsDrawerAnimating(false);
-          setUtilitySubmenuOpen(false); // Reset submenu state when drawer closes
-        }
-      });
-    } else {
-      // Open drawer
-      setDrawerVisible(true);
-      Animated.timing(drawerAnimation, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => {
-        if (isMounted.current) {
-          setIsDrawerAnimating(false);
-        }
-      });
-    }
+    navigation.openDrawer();
   };
 
   const handleDrawerItemPress = (item) => {
-    // Prevent multiple rapid calls
-    if (isDrawerAnimating) return;
-
-    // Handle Utility submenu toggle
     if (item === "Utility") {
       setUtilitySubmenuOpen(!utilitySubmenuOpen);
       return;
-    }
-
-    // Close drawer first, then navigate after animation completes
-    if (drawerVisible) {
-      setIsDrawerAnimating(true);
-      Animated.timing(drawerAnimation, {
-        toValue: -screenWidth * 0.8,
-        duration: 300,
-        useNativeDriver: true,
-      }).start(() => {
-        if (isMounted.current) {
-          setDrawerVisible(false);
-          setIsDrawerAnimating(false);
-          setUtilitySubmenuOpen(false); // Reset submenu state
-
-          // Navigate after drawer is closed
-          setTimeout(() => {
-            if (isMounted.current) {
-              if (item === "Helpdesk") {
-                navigation.navigate("Helpdesk");
-              } else if (item === "Grievance") {
-                navigation.navigate("Grievance");
-              } else if (item === "SubscribeMembership") {
-                navigation.navigate("SubscribeMembership");
-              } else if (item === "CoursePlacement") {
-                navigation.navigate("CoursePlacement");
-              } else if (item === "HostelIdFee") {
-                navigation.navigate("HostelIdFee");
-              } else if (item === "Settings") {
-                navigation.navigate("Settings");
-              } else {
-                Alert.alert("Navigation", `Navigate to ${item}`);
-              }
-            }
-          }, 100); // Small delay to ensure state updates are complete
-        }
-      });
     }
   };
 
@@ -358,7 +278,6 @@ export default function DashboardScreen({ navigation }) {
           <TouchableOpacity
             style={styles.menuButton}
             onPress={toggleDrawer}
-            disabled={isDrawerAnimating}
             activeOpacity={0.7}
           >
             <Ionicons name="menu" size={24} color={colors.primary} />
@@ -562,165 +481,6 @@ export default function DashboardScreen({ navigation }) {
             )}
           </View>
         </ScrollView>
-
-        {/* Drawer Modal */}
-        <Modal
-          visible={drawerVisible}
-          transparent
-          animationType="none"
-          onRequestClose={toggleDrawer}
-        >
-          <TouchableOpacity
-            style={[styles.drawerOverlay, { backgroundColor: colors.overlay }]}
-            activeOpacity={1}
-            onPress={toggleDrawer}
-            disabled={isDrawerAnimating}
-          >
-            <Animated.View
-              style={[
-                styles.drawer,
-                {
-                  backgroundColor: colors.surface,
-                  transform: [{ translateX: drawerAnimation }],
-                  paddingTop: insets.top + 20, // Add safe area top padding
-                  height: screenHeight, // Dynamic height based on screen
-                  width: screenWidth * 0.8, // Dynamic width based on screen
-                },
-              ]}
-            >
-              <TouchableOpacity activeOpacity={1}>
-                <View style={[styles.drawerHeader, { borderBottomColor: colors.border }]}>
-                  <Text style={[styles.drawerTitle, { color: colors.primary }]}>Menu</Text>
-                  <TouchableOpacity
-                    onPress={toggleDrawer}
-                    disabled={isDrawerAnimating}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons name="close" size={24} color={colors.primary} />
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.drawerContent}>
-                  <TouchableOpacity
-                    style={styles.drawerItem}
-                    onPress={() => handleDrawerItemPress("Helpdesk")}
-                    disabled={isDrawerAnimating}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name="help-circle-outline"
-                      size={24}
-                      color={colors.primary}
-                    />
-                    <Text style={[styles.drawerItemText, { color: colors.text }]}>Helpdesk</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.drawerItem}
-                    onPress={() => handleDrawerItemPress("Grievance")}
-                    disabled={isDrawerAnimating}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name="alert-circle-outline"
-                      size={24}
-                      color={colors.primary}
-                    />
-                    <Text style={[styles.drawerItemText, { color: colors.text }]}>Grievance</Text>
-                  </TouchableOpacity>
-
-                  {/* Utility with submenu */}
-                  <TouchableOpacity
-                    style={styles.drawerItem}
-                    onPress={() => handleDrawerItemPress("Utility")}
-                    disabled={isDrawerAnimating}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name="construct-outline"
-                      size={24}
-                      color={colors.primary}
-                    />
-                    <Text style={[styles.drawerItemText, { color: colors.text }]}>Utility</Text>
-                    <Ionicons
-                      name={utilitySubmenuOpen ? "chevron-up" : "chevron-down"}
-                      size={20}
-                      color={colors.textSecondary}
-                      style={styles.submenuIcon}
-                    />
-                  </TouchableOpacity>
-
-                  {/* Utility Submenu */}
-                  {utilitySubmenuOpen && (
-                    <View style={styles.submenuContainer}>
-                      <TouchableOpacity
-                        style={styles.submenuItem}
-                        onPress={() => handleDrawerItemPress("SubscribeMembership")}
-                        disabled={isDrawerAnimating}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons
-                          name="card-outline"
-                          size={20}
-                          color={colors.textSecondary}
-                        />
-                        <Text style={[styles.submenuItemText, { color: colors.textSecondary }]}>
-                          Subscribe Membership
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.submenuItem}
-                        onPress={() => handleDrawerItemPress("CoursePlacement")}
-                        disabled={isDrawerAnimating}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons
-                          name="school-outline"
-                          size={20}
-                          color={colors.textSecondary}
-                        />
-                        <Text style={[styles.submenuItemText, { color: colors.textSecondary }]}>
-                          Course & Placement
-                        </Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity
-                        style={styles.submenuItem}
-                        onPress={() => handleDrawerItemPress("HostelIdFee")}
-                        disabled={isDrawerAnimating}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons
-                          name="business-outline"
-                          size={20}
-                          color={colors.textSecondary}
-                        />
-                        <Text style={[styles.submenuItemText, { color: colors.textSecondary }]}>
-                          Hostel & ID Fee
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-
-                  <TouchableOpacity
-                    style={styles.drawerItem}
-                    onPress={() => handleDrawerItemPress("Settings")}
-                    disabled={isDrawerAnimating}
-                    activeOpacity={0.7}
-                  >
-                    <Ionicons
-                      name="settings-outline"
-                      size={24}
-                      color={colors.primary}
-                    />
-                    <Text style={[styles.drawerItemText, { color: colors.text }]}>Settings</Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            </Animated.View>
-          </TouchableOpacity>
-        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -881,53 +641,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontStyle: "italic",
   },
-  drawerOverlay: {
-    flex: 1,
-  },
-  drawer: {
-    // Dynamic width and height are now set inline for better responsiveness
-  },
-  drawerHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-  },
-  drawerTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-  },
-  drawerContent: {
-    paddingTop: 20,
-  },
-  drawerItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  drawerItemText: {
-    fontSize: 16,
-    marginLeft: 16,
-    flex: 1,
-  },
-  submenuIcon: {
-    marginLeft: 'auto',
-  },
-  submenuContainer: {
-    paddingLeft: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.05)',
-  },
-  submenuItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  submenuItemText: {
-    fontSize: 14,
-    marginLeft: 12,
-  },
+  drawerOverlay: {},
+  drawer: {},
+  drawerHeader: {},
+  drawerTitle: {},
+  drawerContent: {},
+  drawerItem: {},
+  drawerItemText: {},
+  submenuIcon: {},
+  submenuContainer: {},
+  submenuItem: {},
+  submenuItemText: {},
 });
