@@ -64,6 +64,14 @@ export default function PaymentHistoryScreen({ navigation }) {
     loadPaymentHistory(statusFilter, true);
   }, [statusFilter]);
 
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      setShowFilterDropdown(false);
+      setStatusFilter("");
+    });
+    return unsubscribe;
+  }, [navigation]);
+
   const loadPaymentHistory = async (filter = "", reset = true) => {
     try {
       setError(null);
