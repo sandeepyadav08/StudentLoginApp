@@ -9,6 +9,7 @@ import {
   TextInput,
   Platform,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -47,6 +48,9 @@ const HelpdeskFormScreen = ({ navigation }) => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimeFromPicker, setShowTimeFromPicker] = useState(false);
   const [showTimeToPicker, setShowTimeToPicker] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date());
+  const [tempTimeFrom, setTempTimeFrom] = useState(new Date());
+  const [tempTimeTo, setTempTimeTo] = useState(new Date());
 
   // Dynamic categories from API
   const [mainCategories, setMainCategories] = useState([]);
@@ -172,25 +176,38 @@ const HelpdeskFormScreen = ({ navigation }) => {
   };
 
   const handleDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setAvailableDate(selectedDate);
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+      if (selectedDate) setAvailableDate(selectedDate);
+    } else {
+      if (selectedDate) setTempDate(selectedDate);
     }
   };
 
   const handleTimeFromChange = (event, selectedTime) => {
-    setShowTimeFromPicker(false);
-    if (selectedTime) {
-      setAvailableTimeFrom(selectedTime);
+    if (Platform.OS === 'android') {
+      setShowTimeFromPicker(false);
+      if (selectedTime) setAvailableTimeFrom(selectedTime);
+    } else {
+      if (selectedTime) setTempTimeFrom(selectedTime);
     }
   };
 
   const handleTimeToChange = (event, selectedTime) => {
-    setShowTimeToPicker(false);
-    if (selectedTime) {
-      setAvailableTimeTo(selectedTime);
+    if (Platform.OS === 'android') {
+      setShowTimeToPicker(false);
+      if (selectedTime) setAvailableTimeTo(selectedTime);
+    } else {
+      if (selectedTime) setTempTimeTo(selectedTime);
     }
   };
+
+  const openDatePicker = () => { setTempDate(availableDate); setShowDatePicker(true); };
+  const openTimeFromPicker = () => { setTempTimeFrom(availableTimeFrom); setShowTimeFromPicker(true); };
+  const openTimeToPicker = () => { setTempTimeTo(availableTimeTo); setShowTimeToPicker(true); };
+  const confirmDate = () => { setAvailableDate(tempDate); setShowDatePicker(false); };
+  const confirmTimeFrom = () => { setAvailableTimeFrom(tempTimeFrom); setShowTimeFromPicker(false); };
+  const confirmTimeTo = () => { setAvailableTimeTo(tempTimeTo); setShowTimeToPicker(false); };
 
   const handleFilePicker = async () => {
     try {
@@ -486,9 +503,9 @@ const HelpdeskFormScreen = ({ navigation }) => {
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          style={styles.backButton}
+          style={[styles.backButton, { backgroundColor: '#EEF0FF', width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' }]}
         >
-          <Ionicons name="arrow-back" size={24} color="#8b5cf6" />
+          <Ionicons name="chevron-back" size={22} color="#6C63FF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Submit Your Complaint</Text>
         <View style={styles.placeholder} />
@@ -519,7 +536,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
                   ? getCategoryText(mainCategory, mainCategories)
                   : "Choose a category"}
               </Text>
-              <Ionicons name="chevron-down" size={20} color="#8b5cf6" />
+              <Ionicons name="chevron-down" size={20} color="#6C63FF" />
             </TouchableOpacity>
             {errors.mainCategory && (
               <Text style={styles.errorText}>{errors.mainCategory}</Text>
@@ -572,7 +589,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
                     size={20}
                     color={
                       mainCategory && mainCategory !== "other"
-                        ? "#8b5cf6"
+                        ? "#6C63FF"
                         : "#ccc"
                     }
                   />
@@ -588,12 +605,12 @@ const HelpdeskFormScreen = ({ navigation }) => {
             <Text style={styles.label}>Available Date (DD-MM-YYYY)</Text>
             <TouchableOpacity
               style={styles.dateTimeButton}
-              onPress={() => setShowDatePicker(true)}
+              onPress={openDatePicker}
             >
               <Text style={styles.dateTimeText}>
                 {formatDate(availableDate)}
               </Text>
-              <Ionicons name="calendar-outline" size={20} color="#8b5cf6" />
+              <Ionicons name="calendar-outline" size={20} color="#6C63FF" />
             </TouchableOpacity>
 
             <Text style={[styles.label, { marginTop: 16 }]}>
@@ -604,12 +621,12 @@ const HelpdeskFormScreen = ({ navigation }) => {
                 <Text style={styles.timeLabel}>From:</Text>
                 <TouchableOpacity
                   style={styles.timeButton}
-                  onPress={() => setShowTimeFromPicker(true)}
+                  onPress={openTimeFromPicker}
                 >
                   <Text style={styles.dateTimeText}>
                     {formatTime12Hr(availableTimeFrom)}
                   </Text>
-                  <Ionicons name="time-outline" size={16} color="#8b5cf6" />
+                  <Ionicons name="time-outline" size={16} color="#6C63FF" />
                 </TouchableOpacity>
               </View>
 
@@ -617,12 +634,12 @@ const HelpdeskFormScreen = ({ navigation }) => {
                 <Text style={styles.timeLabel}>To:</Text>
                 <TouchableOpacity
                   style={styles.timeButton}
-                  onPress={() => setShowTimeToPicker(true)}
+                  onPress={openTimeToPicker}
                 >
                   <Text style={styles.dateTimeText}>
                     {formatTime12Hr(availableTimeTo)}
                   </Text>
-                  <Ionicons name="time-outline" size={16} color="#8b5cf6" />
+                  <Ionicons name="time-outline" size={16} color="#6C63FF" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -669,12 +686,12 @@ const HelpdeskFormScreen = ({ navigation }) => {
                       : "Choose a file (Max 2MB)"}
                   </Text>
                   {isUploading ? (
-                    <ActivityIndicator size="small" color="#8b5cf6" />
+                    <ActivityIndicator size="small" color="#6C63FF" />
                   ) : (
                     <Ionicons
                       name="cloud-upload-outline"
                       size={24}
-                      color="#8b5cf6"
+                      color="#6C63FF"
                     />
                   )}
                 </View>
@@ -698,7 +715,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
                   <Ionicons
                     name="document-outline"
                     size={20}
-                    color="#8b5cf6"
+                    color="#6C63FF"
                     style={styles.fileIcon}
                   />
                   <Text style={styles.selectedFileName} numberOfLines={1}>
@@ -726,7 +743,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
                 {/* Upload Status */}
                 {isUploading && (
                   <View style={styles.uploadingStatus}>
-                    <ActivityIndicator size="small" color="#8b5cf6" />
+                    <ActivityIndicator size="small" color="#6C63FF" />
                     <Text style={styles.uploadingStatusText}>
                       Uploading... {Math.round(uploadProgress)}%
                     </Text>
@@ -816,34 +833,111 @@ const HelpdeskFormScreen = ({ navigation }) => {
       )}
 
       {/* Date Picker */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={availableDate}
-          mode="date"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={handleDateChange}
-          minimumDate={new Date()}
-        />
+      {Platform.OS === 'ios' ? (
+        <Modal visible={showDatePicker} transparent animationType="slide">
+          <View style={styles.dateModalOverlay}>
+            <View style={styles.dateModalContainer}>
+              <View style={styles.dateModalHeader}>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={styles.dateModalCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.dateModalTitle}>Select Date</Text>
+                <TouchableOpacity onPress={confirmDate}>
+                  <Text style={styles.dateModalDone}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={tempDate}
+                mode="date"
+                display="inline"
+                onChange={handleDateChange}
+                minimumDate={new Date()}
+                accentColor="#6C63FF"
+                style={{ width: '100%' }}
+              />
+            </View>
+          </View>
+        </Modal>
+      ) : (
+        showDatePicker && (
+          <DateTimePicker
+            value={availableDate}
+            mode="date"
+            display="default"
+            onChange={handleDateChange}
+            minimumDate={new Date()}
+          />
+        )
       )}
 
       {/* Time From Picker */}
-      {showTimeFromPicker && (
-        <DateTimePicker
-          value={availableTimeFrom}
-          mode="time"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={handleTimeFromChange}
-        />
+      {Platform.OS === 'ios' ? (
+        <Modal visible={showTimeFromPicker} transparent animationType="slide">
+          <View style={styles.dateModalOverlay}>
+            <View style={styles.dateModalContainer}>
+              <View style={styles.dateModalHeader}>
+                <TouchableOpacity onPress={() => setShowTimeFromPicker(false)}>
+                  <Text style={styles.dateModalCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.dateModalTitle}>From Time</Text>
+                <TouchableOpacity onPress={confirmTimeFrom}>
+                  <Text style={styles.dateModalDone}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={tempTimeFrom}
+                mode="time"
+                display="spinner"
+                onChange={handleTimeFromChange}
+                style={styles.timePickerIOS}
+              />
+            </View>
+          </View>
+        </Modal>
+      ) : (
+        showTimeFromPicker && (
+          <DateTimePicker
+            value={availableTimeFrom}
+            mode="time"
+            display="default"
+            onChange={handleTimeFromChange}
+          />
+        )
       )}
 
       {/* Time To Picker */}
-      {showTimeToPicker && (
-        <DateTimePicker
-          value={availableTimeTo}
-          mode="time"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
-          onChange={handleTimeToChange}
-        />
+      {Platform.OS === 'ios' ? (
+        <Modal visible={showTimeToPicker} transparent animationType="slide">
+          <View style={styles.dateModalOverlay}>
+            <View style={styles.dateModalContainer}>
+              <View style={styles.dateModalHeader}>
+                <TouchableOpacity onPress={() => setShowTimeToPicker(false)}>
+                  <Text style={styles.dateModalCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.dateModalTitle}>To Time</Text>
+                <TouchableOpacity onPress={confirmTimeTo}>
+                  <Text style={styles.dateModalDone}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={tempTimeTo}
+                mode="time"
+                display="spinner"
+                onChange={handleTimeToChange}
+                style={styles.timePickerIOS}
+              />
+            </View>
+          </View>
+        </Modal>
+      ) : (
+        showTimeToPicker && (
+          <DateTimePicker
+            value={availableTimeTo}
+            mode="time"
+            display="default"
+            onChange={handleTimeToChange}
+          />
+        )
       )}
     </SafeAreaView>
   );
@@ -852,7 +946,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f3e8ff",
+    backgroundColor: "#F5F3FF",
   },
   header: {
     flexDirection: "row",
@@ -860,16 +954,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingVertical: 15,
-    backgroundColor: "#f3e8ff",
+    backgroundColor: "#F5F3FF",
     borderBottomWidth: 0,
   },
   backButton: {
     padding: 8,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#8b5cf6",
+    fontSize: 19,
+    fontWeight: "700",
+    color: "#6C63FF",
+    letterSpacing: 0.3,
   },
   placeholder: {
     width: 40,
@@ -879,92 +974,90 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   formContainer: {
-    backgroundColor: "rgba(255, 255, 255, 0.95)",
-    borderRadius: 20,
-    padding: 20,
-    shadowColor: "#8b5cf6",
-    shadowOffset: {
-      width: 0,
-      height: 10,
-    },
-    shadowOpacity: 0.15,
+    backgroundColor: "#ffffff",
+    borderRadius: 24,
+    padding: 22,
+    shadowColor: "#4C1D95",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.10,
     shadowRadius: 20,
-    elevation: 10,
+    elevation: 8,
   },
   categorySection: {
-    marginBottom: 24,
-    padding: 16,
-    backgroundColor: "#faf5ff",
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#e9d5ff",
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0EEF8",
   },
   label: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
-    color: "#6b21a8",
+    color: "#1A1A2E",
     marginBottom: 8,
   },
   pickerButton: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 12,
+    padding: 14,
     borderWidth: 1,
-    borderColor: "#d8b4fe",
-    borderRadius: 8,
-    backgroundColor: "#fff",
+    borderColor: "#E8E6F0",
+    borderRadius: 12,
+    backgroundColor: "#F8F7FF",
   },
   disabledButton: {
-    backgroundColor: "#faf5ff",
-    borderColor: "#e9d5ff",
+    backgroundColor: "#F5F3FF",
+    borderColor: "#E8E6F0",
+    opacity: 0.6,
   },
   pickerText: {
-    fontSize: 16,
-    color: "#6b21a8",
+    fontSize: 15,
+    color: "#1A1A2E",
     flex: 1,
   },
   placeholderText: {
-    color: "#999",
+    color: "#A0AEC0",
   },
   input: {
     borderWidth: 1,
-    borderColor: "#d8b4fe",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: "#fff",
+    borderColor: "#E8E6F0",
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
+    color: "#1A1A2E",
+    backgroundColor: "#F8F7FF",
   },
   dateTimeButton: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 12,
+    padding: 14,
     borderWidth: 1,
-    borderColor: "#d8b4fe",
-    borderRadius: 8,
-    backgroundColor: "#fff",
+    borderColor: "#E8E6F0",
+    borderRadius: 12,
+    backgroundColor: "#F8F7FF",
   },
   dateTimeText: {
-    fontSize: 16,
-    color: "#6b21a8",
+    fontSize: 15,
+    color: "#1A1A2E",
   },
   textArea: {
     borderWidth: 1,
-    borderColor: "#d8b4fe",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
-    backgroundColor: "#fff",
+    borderColor: "#E8E6F0",
+    borderRadius: 12,
+    padding: 14,
+    fontSize: 15,
+    color: "#1A1A2E",
+    backgroundColor: "#F8F7FF",
     height: 120,
     textAlignVertical: "top",
   },
   fileButton: {
-    borderWidth: 2,
-    borderColor: "#8b5cf6",
+    borderWidth: 1.5,
+    borderColor: "#6C63FF",
     borderStyle: "dashed",
-    borderRadius: 8,
-    backgroundColor: "#faf5ff",
+    borderRadius: 12,
+    backgroundColor: "#EEF0FF",
     padding: 16,
     overflow: "hidden",
   },
@@ -975,7 +1068,7 @@ const styles = StyleSheet.create({
   },
   fileButtonText: {
     fontSize: 16,
-    color: "#8b5cf6",
+    color: "#6C63FF",
     textAlign: "center",
     marginRight: 8,
   },
@@ -991,14 +1084,14 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: "100%",
-    backgroundColor: "#8b5cf6",
+    backgroundColor: "#6C63FF",
     borderRadius: 3,
     minWidth: 2,
   },
   selectedFileContainer: {
     borderWidth: 1,
     borderColor: "#d8b4fe",
-    borderRadius: 8,
+    borderRadius: 12,
     backgroundColor: "#fff",
     padding: 12,
   },
@@ -1037,17 +1130,17 @@ const styles = StyleSheet.create({
   },
   uploadingStatusText: {
     fontSize: 12,
-    color: "#8b5cf6",
+    color: "#6C63FF",
     marginLeft: 8,
     fontWeight: "500",
   },
   submitButton: {
-    backgroundColor: "#8b5cf6",
-    borderRadius: 25,
+    backgroundColor: "#6C63FF",
+    borderRadius: 14,
     padding: 15,
     alignItems: "center",
     marginTop: 20,
-    shadowColor: "#8b5cf6",
+    shadowColor: "#6C63FF",
     shadowOffset: {
       width: 0,
       height: 4,
@@ -1086,7 +1179,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: "#fff",
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 20,
     margin: 20,
     maxHeight: "70%",
@@ -1118,7 +1211,7 @@ const styles = StyleSheet.create({
   },
   modalCancelText: {
     fontSize: 16,
-    color: "#8b5cf6",
+    color: "#6C63FF",
     fontWeight: "600",
   },
   timeRangeContainer: {
@@ -1131,20 +1224,60 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   timeLabel: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "500",
-    color: "#6b21a8",
-    marginBottom: 4,
+    color: "#718096",
+    marginBottom: 6,
   },
   timeButton: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    padding: 10,
+    padding: 13,
     borderWidth: 1,
-    borderColor: "#d8b4fe",
-    borderRadius: 8,
-    backgroundColor: "#fff",
+    borderColor: "#E8E6F0",
+    borderRadius: 12,
+    backgroundColor: "#F8F7FF",
+  },
+  dateModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  dateModalContainer: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 36,
+    paddingHorizontal: 12,
+  },
+  dateModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8E6F0',
+  },
+  dateModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1A1A2E',
+  },
+  dateModalCancel: {
+    fontSize: 15,
+    color: '#A0AEC0',
+    fontWeight: '500',
+  },
+  dateModalDone: {
+    fontSize: 15,
+    color: '#6C63FF',
+    fontWeight: '700',
+  },
+  timePickerIOS: {
+    width: '100%',
+    height: 200,
   },
 });
 

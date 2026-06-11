@@ -286,7 +286,7 @@ export default function DashboardScreen({ navigation }) {
             style={[
               styles.headerTitle,
               { 
-                color: colors.primary,
+                color: '#6C63FF',
                 fontSize: getResponsiveSize(18, screenWidth) 
               },
             ]}
@@ -309,7 +309,7 @@ export default function DashboardScreen({ navigation }) {
             style={[
               styles.welcomeSection,
               {
-                backgroundColor: colors.primary,
+                backgroundColor: '#6C63FF',
                 margin: getResponsivePadding(16, screenWidth),
                 padding: getResponsivePadding(20, screenWidth),
               },
@@ -411,7 +411,7 @@ export default function DashboardScreen({ navigation }) {
                   style={[
                     styles.sectionTitle,
                     { 
-                      color: colors.primary,
+                      color: '#6C63FF',
                       fontSize: getResponsiveSize(18, screenWidth) 
                     },
                   ]}
@@ -423,7 +423,7 @@ export default function DashboardScreen({ navigation }) {
                     style={[
                       styles.refreshButton,
                       {
-                        color: colors.primary,
+                        color: '#6C63FF',
                         fontSize: getResponsiveSize(14, screenWidth),
                         opacity: refreshing ? 0.5 : 1,
                       },
@@ -503,30 +503,50 @@ const styles = StyleSheet.create({
     marginTop: Platform.OS === "android" ? 0 : 0,
   },
   menuButton: {
-    padding: 8,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#EEF0FF',
+    padding: 0,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
+    fontSize: 19,
+    fontWeight: "700",
+    letterSpacing: 0.3,
   },
   notificationButton: {
-    padding: 8,
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#EEF0FF',
+    padding: 0,
   },
   scrollContainer: {
     flex: 1,
   },
   welcomeSection: {
     margin: 16,
-    padding: 14,
-    borderRadius: 16,
+    padding: 20,
+    borderRadius: 22,
+    shadowColor: '#4C1D95',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    elevation: 8,
   },
   welcomeTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
+    fontSize: 20,
+    fontWeight: "700",
     marginBottom: 4,
+    letterSpacing: 0.2,
   },
   welcomeSubtitle: {
     fontSize: 13,
+    opacity: 0.85,
   },
   statsContainer: {
     flexDirection: "row",
@@ -537,25 +557,36 @@ const styles = StyleSheet.create({
   statCard: {
     width: "31%",
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 20,
     alignItems: "center",
+    shadowColor: '#4C1D95',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 10,
+    elevation: 4,
   },
   statIcon: {
     marginBottom: 8,
   },
   statCount: {
-    fontSize: 28,
-    fontWeight: "bold",
+    fontSize: 26,
+    fontWeight: "800",
     marginBottom: 4,
   },
   statTitle: {
-    fontSize: 12,
+    fontSize: 11,
+    fontWeight: "600",
     textAlign: "center",
   },
   subscriptionSection: {
     marginHorizontal: 16,
-    borderRadius: 16,
+    borderRadius: 22,
     marginBottom: 16,
+    shadowColor: '#4C1D95',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.10,
+    shadowRadius: 14,
+    elevation: 5,
   },
   sectionHeader: {
     flexDirection: "row",

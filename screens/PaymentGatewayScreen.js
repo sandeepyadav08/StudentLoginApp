@@ -104,7 +104,7 @@ const PaymentGatewayScreen = ({ navigation }) => {
           }
           .spinner {
             border: 4px solid #f3f3f3;
-            border-top: 4px solid #8b5cf6;
+            border-top: 4px solid #6C63FF;
             border-radius: 50%;
             width: 40px;
             height: 40px;
@@ -143,8 +143,8 @@ const PaymentGatewayScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={handleBackPress} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color="#8b5cf6" />
+        <TouchableOpacity onPress={handleBackPress} style={[styles.backButton, { backgroundColor: '#EEF0FF', width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' }]}>
+          <Ionicons name="chevron-back" size={22} color="#6C63FF" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Payment Gateway</Text>
         <View style={styles.placeholder} />
@@ -162,7 +162,7 @@ const PaymentGatewayScreen = ({ navigation }) => {
         startInLoadingState={true}
         renderLoading={() => (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#8b5cf6" />
+            <ActivityIndicator size="large" color="#6C63FF" />
             <Text style={styles.loadingText}>Loading Payment Gateway...</Text>
           </View>
         )}
@@ -174,7 +174,7 @@ const PaymentGatewayScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#ffffff",
+    backgroundColor: '#F5F3FF',
   },
   header: {
     flexDirection: "row",
@@ -182,17 +182,17 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingVertical: 15,
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    backgroundColor: '#F5F3FF',
+    borderBottomWidth: 0,
   },
   backButton: {
     padding: 8,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "#1f2937",
+    fontSize: 19,
+    fontWeight: "700",
+    color: "#6C63FF",
+    letterSpacing: 0.3,
   },
   placeholder: {
     width: 40,

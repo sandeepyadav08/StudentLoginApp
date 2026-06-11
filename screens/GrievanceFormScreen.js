@@ -53,6 +53,7 @@ const GrievanceFormScreen = ({ navigation }) => {
   const [showMainCategoryPicker, setShowMainCategoryPicker] = useState(false);
   const [showSubCategoryPicker, setShowSubCategoryPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [tempDate, setTempDate] = useState(new Date());
   
   // Dynamic categories from API
   const [mainCategories, setMainCategories] = useState([]);
@@ -322,10 +323,22 @@ const GrievanceFormScreen = ({ navigation }) => {
   };
 
   const handleDateChange = (event, selectedDate) => {
-    setShowDatePicker(false);
-    if (selectedDate) {
-      setIncidentDate(selectedDate);
+    if (Platform.OS === 'android') {
+      setShowDatePicker(false);
+      if (selectedDate) setIncidentDate(selectedDate);
+    } else {
+      if (selectedDate) setTempDate(selectedDate);
     }
+  };
+
+  const openDatePicker = () => {
+    setTempDate(incidentDate);
+    setShowDatePicker(true);
+  };
+
+  const confirmDate = () => {
+    setIncidentDate(tempDate);
+    setShowDatePicker(false);
   };
 
   const formatDate = (date) => {
@@ -352,9 +365,9 @@ const GrievanceFormScreen = ({ navigation }) => {
         }]}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
-            style={styles.backButton}
+            style={[styles.backButton, { backgroundColor: '#EEF0FF', width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' }]}
           >
-            <Ionicons name="arrow-back" size={24} color="#8b5cf6" />
+            <Ionicons name="chevron-back" size={22} color="#6C63FF" />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { fontSize: getResponsiveSize(18, screenWidth) }]}>
             Submit Grievance
@@ -364,7 +377,7 @@ const GrievanceFormScreen = ({ navigation }) => {
         
         {/* Loading Content */}
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#7c3aed" />
+          <ActivityIndicator size="large" color="#6C63FF" />
           <Text style={[styles.loadingText, { fontSize: getResponsiveSize(16, screenWidth) }]}>
             {isLoadingUserData && isLoadingCategories 
               ? "Loading form data..."
@@ -387,9 +400,9 @@ const GrievanceFormScreen = ({ navigation }) => {
       }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          style={styles.backButton}
+          style={[styles.backButton, { backgroundColor: '#EEF0FF', width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' }]}
         >
-          <Ionicons name="arrow-back" size={24} color="#8b5cf6" />
+          <Ionicons name="chevron-back" size={22} color="#6C63FF" />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { fontSize: getResponsiveSize(18, screenWidth) }]}>
           Submit Grievance
@@ -522,7 +535,7 @@ const GrievanceFormScreen = ({ navigation }) => {
                   : (mainCategory ? getCategoryText(mainCategory, mainCategories) : "Choose a category")
                 }
               </Text>
-              <Ionicons name="chevron-down" size={20} color="#8b5cf6" />
+              <Ionicons name="chevron-down" size={20} color="#6C63FF" />
             </TouchableOpacity>
             {errors.mainCategory && <Text style={styles.errorText}>{errors.mainCategory}</Text>}
           </View>
@@ -550,7 +563,7 @@ const GrievanceFormScreen = ({ navigation }) => {
                     : isLoadingCategories ? "Loading subcategories..." : "Choose sub category"
                   }
                 </Text>
-                <Ionicons name="chevron-down" size={20} color="#8b5cf6" />
+                <Ionicons name="chevron-down" size={20} color="#6C63FF" />
               </TouchableOpacity>
               {errors.subCategory && <Text style={styles.errorText}>{errors.subCategory}</Text>}
             </View>
@@ -596,13 +609,13 @@ const GrievanceFormScreen = ({ navigation }) => {
             </Text>
             <TouchableOpacity
               style={styles.dateButton}
-              onPress={() => setShowDatePicker(true)}
+              onPress={openDatePicker}
               disabled={isSubmitting}
             >
               <Text style={[styles.dateText, { fontSize: getResponsiveSize(14, screenWidth) }]}>
                 {formatDate(incidentDate)}
               </Text>
-              <Ionicons name="calendar-outline" size={20} color="#8b5cf6" />
+              <Ionicons name="calendar-outline" size={20} color="#6C63FF" />
             </TouchableOpacity>
           </View>
 
@@ -680,14 +693,41 @@ const GrievanceFormScreen = ({ navigation }) => {
       </Modal>
 
       {/* Date Picker */}
-      {showDatePicker && (
-        <DateTimePicker
-          value={incidentDate}
-          mode="date"
-          display="default"
-          onChange={handleDateChange}
-          maximumDate={new Date()}
-        />
+      {Platform.OS === 'ios' ? (
+        <Modal visible={showDatePicker} transparent animationType="slide">
+          <View style={styles.dateModalOverlay}>
+            <View style={styles.dateModalContainer}>
+              <View style={styles.dateModalHeader}>
+                <TouchableOpacity onPress={() => setShowDatePicker(false)}>
+                  <Text style={styles.dateModalCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.dateModalTitle}>Select Date</Text>
+                <TouchableOpacity onPress={confirmDate}>
+                  <Text style={styles.dateModalDone}>Done</Text>
+                </TouchableOpacity>
+              </View>
+              <DateTimePicker
+                value={tempDate}
+                mode="date"
+                display="inline"
+                onChange={handleDateChange}
+                maximumDate={new Date()}
+                accentColor="#6C63FF"
+                style={{ width: '100%' }}
+              />
+            </View>
+          </View>
+        </Modal>
+      ) : (
+        showDatePicker && (
+          <DateTimePicker
+            value={incidentDate}
+            mode="date"
+            display="default"
+            onChange={handleDateChange}
+            maximumDate={new Date()}
+          />
+        )
       )}
     </SafeAreaView>
   );
@@ -696,27 +736,27 @@ const GrievanceFormScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#F5F3FF",
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
+    backgroundColor: "#F5F3FF",
     borderBottomWidth: 0,
-    elevation: 2,
-    shadowColor: "#000",
+    elevation: 5,
+    shadowColor: "#4C1D95",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
   backButton: {
     padding: 8,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   headerTitle: {
     fontWeight: "600",
-    color: "#7c3aed",
+    color: "#6C63FF",
   },
   placeholder: {
     width: 40,
@@ -737,20 +777,20 @@ const styles = StyleSheet.create({
   },
   formContainer: {
     backgroundColor: "#ffffff",
-    borderRadius: 12,
+    borderRadius: 24,
     marginBottom: 20,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    elevation: 8,
+    shadowColor: "#4C1D95",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.10,
+    shadowRadius: 20,
   },
   sectionTitle: {
     fontWeight: "600",
-    color: "#374151",
+    color: "#1A1A2E",
     marginBottom: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    borderBottomColor: "#F0EEF8",
     paddingBottom: 8,
   },
   inputSection: {
@@ -758,28 +798,28 @@ const styles = StyleSheet.create({
   },
   label: {
     fontWeight: "500",
-    color: "#374151",
+    color: "#1A1A2E",
     marginBottom: 8,
   },
   textInput: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 8,
+    borderColor: "#E8E6F0",
+    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 14,
-    color: "#374151",
-    backgroundColor: "#f9fafb",
+    color: "#1A1A2E",
+    backgroundColor: "#F8F7FF",
   },
   textAreaInput: {
     borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 8,
+    borderColor: "#E8E6F0",
+    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 14,
-    color: "#374151",
-    backgroundColor: "#f9fafb",
+    color: "#1A1A2E",
+    backgroundColor: "#F8F7FF",
     height: 120,
   },
   inputError: {
@@ -791,14 +831,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 8,
+    borderColor: "#E8E6F0",
+    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#F8F7FF",
   },
   pickerText: {
-    color: "#374151",
+    color: "#1A1A2E",
     flex: 1,
   },
   placeholderText: {
@@ -809,14 +849,14 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 8,
+    borderColor: "#E8E6F0",
+    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#F8F7FF",
   },
   dateText: {
-    color: "#374151",
+    color: "#1A1A2E",
   },
   characterCount: {
     fontSize: 12,
@@ -830,13 +870,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   submitButton: {
-    backgroundColor: "#7c3aed",
-    borderRadius: 8,
+    backgroundColor: "#6C63FF",
+    borderRadius: 12,
     paddingVertical: 16,
     alignItems: "center",
     marginTop: 20,
     elevation: 3,
-    shadowColor: "#7c3aed",
+    shadowColor: "#6C63FF",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 4,
@@ -855,8 +895,8 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginTop: 16,
     padding: 12,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 8,
+    backgroundColor: "#EEF0FF",
+    borderRadius: 12,
   },
   disclaimerText: {
     color: "#6b7280",
@@ -872,7 +912,7 @@ const styles = StyleSheet.create({
   },
   modalContent: {
     backgroundColor: "#ffffff",
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 20,
     width: width * 0.9,
     maxHeight: "70%",
@@ -880,7 +920,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#374151",
+    color: "#1A1A2E",
     marginBottom: 16,
     textAlign: "center",
   },
@@ -895,8 +935,44 @@ const styles = StyleSheet.create({
   },
   modalItemText: {
     fontSize: 14,
-    color: "#374151",
+    color: "#1A1A2E",
     lineHeight: 20,
+  },
+  dateModalOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+  },
+  dateModalContainer: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 36,
+    paddingHorizontal: 12,
+  },
+  dateModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E8E6F0',
+  },
+  dateModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#1A1A2E',
+  },
+  dateModalCancel: {
+    fontSize: 15,
+    color: '#A0AEC0',
+    fontWeight: '500',
+  },
+  dateModalDone: {
+    fontSize: 15,
+    color: '#6C63FF',
+    fontWeight: '700',
   },
 });
 

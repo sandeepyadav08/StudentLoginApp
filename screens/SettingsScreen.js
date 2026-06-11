@@ -187,13 +187,13 @@ export default function SettingsScreen({ navigation }) {
           ]}
         >
           <TouchableOpacity
-            style={styles.backButton}
+            style={[styles.backButton, { backgroundColor: colors.primaryContainer || '#EEF0FF', width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' }]}
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
           >
             <Ionicons
-              name="arrow-back"
-              size={24}
+              name="chevron-back"
+              size={22}
               color={colors.primary}
             />
           </TouchableOpacity>
@@ -201,7 +201,7 @@ export default function SettingsScreen({ navigation }) {
             style={[
               styles.headerTitle,
               {
-                color: colors.primary,
+                color: '#6C63FF',
                 fontSize: getResponsiveSize(18, screenWidth),
               },
             ]}
@@ -226,7 +226,7 @@ export default function SettingsScreen({ navigation }) {
               style={[
                 styles.sectionTitle,
                 {
-                  color: colors.primary,
+                  color: '#6C63FF',
                   fontSize: getResponsiveSize(16, screenWidth),
                   marginBottom: getResponsivePadding(12, screenWidth),
                 },
@@ -277,7 +277,7 @@ export default function SettingsScreen({ navigation }) {
               style={[
                 styles.sectionTitle,
                 {
-                  color: colors.primary,
+                  color: '#6C63FF',
                   fontSize: getResponsiveSize(16, screenWidth),
                   marginBottom: getResponsivePadding(12, screenWidth),
                 },
@@ -334,7 +334,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '600',
   },
   headerRight: {
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
   radioButton: {
     width: 24,
     height: 24,
-    borderRadius: 12,
+    borderRadius: 20,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',

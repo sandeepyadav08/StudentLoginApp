@@ -250,7 +250,7 @@ export default function PaymentHistoryScreen({ navigation }) {
                 border: 2px solid #e2e8f0;
             }
             b {
-                color: #7c3aed;
+                color: #6C63FF;
                 font-weight: 600;
             }
             .profile-section {
@@ -309,7 +309,7 @@ export default function PaymentHistoryScreen({ navigation }) {
           style={[
             styles.paymentAmount,
             { 
-              color: colors.primary,
+              color: '#6C63FF',
               fontSize: getResponsiveSize(16, screenWidth) 
             },
           ]}
@@ -401,7 +401,7 @@ export default function PaymentHistoryScreen({ navigation }) {
               setSelectedPayment(null);
             }}
           >
-            <Ionicons name="close" size={24} color="#7c3aed" />
+            <Ionicons name="close" size={24} color="#6C63FF" />
           </TouchableOpacity>
           <Text style={styles.modalTitle}>Payment Details</Text>
           <View style={styles.placeholder} />
@@ -411,7 +411,7 @@ export default function PaymentHistoryScreen({ navigation }) {
         <View style={styles.modalContent}>
           {detailsLoading ? (
             <View style={styles.modalLoadingContainer}>
-              <ActivityIndicator size="large" color="#7c3aed" />
+              <ActivityIndicator size="large" color="#6C63FF" />
               <Text style={styles.loadingText}>Loading details...</Text>
             </View>
           ) : paymentDetails?.html ? (
@@ -504,17 +504,17 @@ export default function PaymentHistoryScreen({ navigation }) {
             ]}
           >
             <TouchableOpacity
-              style={styles.backButton}
+              style={[styles.backButton, { backgroundColor: colors.primaryContainer || '#EEF0FF', width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' }]}
               onPress={() => navigation.goBack()}
             >
-              <Ionicons name="arrow-back" size={24} color={colors.primary} />
+              <Ionicons name="chevron-back" size={22} color={colors.primary} />
             </TouchableOpacity>
             <Text
               style={[
                 styles.headerTitle,
-                { 
-                  color: colors.primary,
-                  fontSize: getResponsiveSize(18, screenWidth) 
+                {
+                  color: '#6C63FF',
+                  fontSize: getResponsiveSize(18, screenWidth)
                 },
               ]}
             >
@@ -559,16 +559,16 @@ export default function PaymentHistoryScreen({ navigation }) {
           ]}
         >
           <TouchableOpacity
-            style={styles.backButton}
+            style={[styles.backButton, { backgroundColor: colors.primaryContainer || '#EEF0FF', width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' }]}
             onPress={() => navigation.goBack()}
           >
-            <Ionicons name="arrow-back" size={24} color={colors.primary} />
+            <Ionicons name="chevron-back" size={22} color={colors.primary} />
           </TouchableOpacity>
           <Text
             style={[
               styles.headerTitle,
               {
-                color: colors.primary,
+                color: '#6C63FF',
                 fontSize: getResponsiveSize(18, screenWidth)
               },
             ]}
@@ -603,7 +603,7 @@ export default function PaymentHistoryScreen({ navigation }) {
               backgroundColor: colors.surface,
               borderWidth: 1,
               borderColor: colors.border,
-              borderRadius: 8,
+              borderRadius: 12,
             }}
             onPress={() => setShowFilterDropdown(!showFilterDropdown)}
           >
@@ -705,8 +705,8 @@ export default function PaymentHistoryScreen({ navigation }) {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={onRefresh}
-                colors={["#7c3aed"]}
-                tintColor="#7c3aed"
+                colors={["#6C63FF"]}
+                tintColor="#6C63FF"
               />
             }
             contentContainerStyle={
@@ -743,7 +743,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: "600",
   },
   refreshHeaderButton: {
@@ -766,11 +766,11 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   paymentItem: {
-    borderRadius: 12,
+    borderRadius: 20,
     marginHorizontal: 16,
     marginBottom: 12,
     padding: 16,
-    shadowColor: "#000",
+    shadowColor: "#4C1D95",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
@@ -815,7 +815,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: 20,
   },
   statusIndicator: {
     width: 6,
@@ -847,7 +847,7 @@ const styles = StyleSheet.create({
   // Modal Styles
   modalContainer: {
     flex: 1,
-    backgroundColor: "#f3e8ff",
+    backgroundColor: "#EEF0FF",
   },
   modalHeader: {
     flexDirection: "row",
@@ -865,7 +865,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#7c3aed",
+    color: "#6C63FF",
   },
   modalContent: {
     flex: 1,
@@ -932,10 +932,10 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: "#7c3aed",
+    backgroundColor: "#6C63FF",
     paddingHorizontal: 24,
     paddingVertical: 12,
-    borderRadius: 8,
+    borderRadius: 12,
   },
   retryButtonText: {
     color: "#ffffff",

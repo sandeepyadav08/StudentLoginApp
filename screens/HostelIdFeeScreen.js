@@ -373,7 +373,7 @@ export default function HostelIdFeeScreen({ navigation }) {
     return hostelData.utility_list.map((hostel) => (
       <View
         key={hostel.id}
-        style={[styles.serviceSection, { backgroundColor: colors.surface }]}
+        style={[styles.serviceSection, { backgroundColor: colors.surface, zIndex: openDropdown === hostel.id ? 100 : 1 }]}
       >
         {/* Hostel Header */}
         <View style={styles.sectionHeader}>
@@ -457,44 +457,41 @@ export default function HostelIdFeeScreen({ navigation }) {
 
             {/* Dropdown Menu */}
             {openDropdown === hostel.id && isHostelSelected(hostel.id) && (
-              <TouchableOpacity
-                activeOpacity={1}
-                onPress={(e) => e.stopPropagation()}
+              <View
                 style={[
                   styles.dropdownMenu,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: colors.border,
-                  },
+                  { backgroundColor: colors.surface, borderColor: '#E8E6F0' },
                 ]}
               >
-                {getHostelPaymentOptions(hostel.id).map((option) => (
-                  <TouchableOpacity
-                    key={option.id}
-                    style={[
-                      styles.dropdownItem,
-                      getHostelPaymentType(hostel.id) === option.value &&
-                        styles.dropdownItemSelected,
-                    ]}
-                    onPress={() => {
-                      handleHostelPaymentSelect(hostel.id, option);
-                    }}
-                  >
-                    <Text
-                      style={[
-                        styles.dropdownItemText,
-                        { color: colors.text },
-                        getHostelPaymentType(hostel.id) === option.value && {
-                          color: colors.primary,
-                          fontWeight: "500",
-                        },
-                      ]}
-                    >
-                      {option.text}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </TouchableOpacity>
+                <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                  {getHostelPaymentOptions(hostel.id).map((option) => {
+                    const isSelected = getHostelPaymentType(hostel.id) === option.value;
+                    return (
+                      <TouchableOpacity
+                        key={option.id}
+                        style={[
+                          styles.dropdownItem,
+                          isSelected && { backgroundColor: '#EEF0FF' },
+                        ]}
+                        onPress={() => handleHostelPaymentSelect(hostel.id, option)}
+                      >
+                        <Text
+                          style={[
+                            styles.dropdownItemText,
+                            { color: colors.text },
+                            isSelected && { fontWeight: '600' },
+                          ]}
+                        >
+                          {option.text}
+                        </Text>
+                        {isSelected && (
+                          <Ionicons name="checkmark-circle" size={18} color="#6C63FF" />
+                        )}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </ScrollView>
+              </View>
             )}
           </View>
         </View>
@@ -547,15 +544,15 @@ export default function HostelIdFeeScreen({ navigation }) {
       >
         <TouchableOpacity
           onPress={() => navigation.goBack()}
-          style={styles.backButton}
+          style={[styles.backButton, { backgroundColor: colors.primaryContainer || '#EEF0FF', width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' }]}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.primary} />
+          <Ionicons name="chevron-back" size={22} color={colors.primary} />
         </TouchableOpacity>
         <Text
           style={[
             styles.headerTitle,
             {
-              color: colors.primary,
+              color: '#6C63FF',
               fontSize: 18,
             },
           ]}
@@ -625,7 +622,7 @@ export default function HostelIdFeeScreen({ navigation }) {
                         <Ionicons
                           name={provider.icon}
                           size={24}
-                          color="#8b5cf6"
+                          color="#6C63FF"
                         />
                         <Text
                           style={[
@@ -751,20 +748,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   serviceSection: {
-    borderRadius: 12,
+    borderRadius: 20,
     padding: 20,
     marginBottom: 16,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
+    elevation: 6,
+    shadowColor: "#4C1D95",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
   },
   sectionHeader: {
     marginBottom: 20,
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    borderBottomColor: "#F0EEF8",
   },
   checkboxContainer: {
     flexDirection: "row",
@@ -777,19 +774,19 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 8,
     borderWidth: 2,
-    borderColor: "#d1d5db",
+    borderColor: "#E8E6F0",
     backgroundColor: "#ffffff",
     justifyContent: "center",
     alignItems: "center",
   },
   checkboxChecked: {
-    backgroundColor: "#8b5cf6",
-    borderColor: "#8b5cf6",
+    backgroundColor: "#6C63FF",
+    borderColor: "#6C63FF",
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#374151",
+    color: "#1A1A2E",
     marginBottom: 16,
   },
   serviceTitle: {
@@ -810,19 +807,19 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: "#E8E6F0",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 12,
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#F8F7FF",
   },
   pickerButtonText: {
-    color: "#374151",
+    color: "#1A1A2E",
     flex: 1,
     fontSize: 14,
   },
   pickerButtonDisabled: {
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#F8F7FF",
     borderColor: "#e5e7eb",
   },
   pickerButtonTextDisabled: {
@@ -831,11 +828,11 @@ const styles = StyleSheet.create({
   pickerButtonOpen: {
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
-    borderBottomColor: "#8b5cf6",
+    borderBottomColor: "#6C63FF",
   },
   dropdownContainer: {
     position: "relative",
-    zIndex: 1000,
+    zIndex: 999,
   },
   dropdownMenu: {
     position: "absolute",
@@ -844,33 +841,33 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: "#ffffff",
     borderWidth: 1,
-    borderColor: "#d1d5db",
+    borderColor: "#E8E6F0",
     borderTopWidth: 0,
-    borderBottomLeftRadius: 8,
-    borderBottomRightRadius: 8,
-    maxHeight: 250,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    zIndex: 1001,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    maxHeight: 220,
+    elevation: 20,
+    shadowColor: "#4C1D95",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    zIndex: 9999,
   },
   dropdownItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 13,
     borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
+    borderBottomColor: "#F0EEF8",
   },
   dropdownItemSelected: {
-    backgroundColor: "#f0f9ff",
+    backgroundColor: "#EEF0FF",
   },
   dropdownItemText: {
     fontSize: 14,
-    color: "#374151",
+    color: "#1A1A2E",
     flex: 1,
   },
   amountContainer: {
@@ -914,7 +911,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   paymentOptionSelected: {
-    borderColor: "#8b5cf6",
+    borderColor: "#6C63FF",
   },
   paymentOptionText: {
     marginLeft: 8,
@@ -922,15 +919,15 @@ const styles = StyleSheet.create({
   },
   payButton: {
     backgroundColor: "#6b7280",
-    borderRadius: 30,
+    borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
     marginHorizontal: 16,
     marginBottom: 20,
     elevation: 3,
-    shadowColor: "#000",
+    shadowColor: "#4C1D95",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.12,
     shadowRadius: 4,
   },
   payButtonActive: {
