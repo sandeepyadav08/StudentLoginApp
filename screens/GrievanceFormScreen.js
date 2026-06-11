@@ -53,6 +53,7 @@ const GrievanceFormScreen = ({ navigation }) => {
   const [showMainCategoryPicker, setShowMainCategoryPicker] = useState(false);
   const [showSubCategoryPicker, setShowSubCategoryPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [openDropdown, setOpenDropdown] = useState(null);
   const [tempDate, setTempDate] = useState(new Date());
   
   // Dynamic categories from API
@@ -311,14 +312,14 @@ const GrievanceFormScreen = ({ navigation }) => {
 
   const handleMainCategorySelect = (category) => {
     setMainCategory(category.value);
-    setSubCategory(""); // Reset subcategory
-    setShowMainCategoryPicker(false);
+    setSubCategory("");
+    setOpenDropdown(null);
     setErrors({ ...errors, mainCategory: "", subCategory: "" });
   };
 
   const handleSubCategorySelect = (category) => {
     setSubCategory(category.value);
-    setShowSubCategoryPicker(false);
+    setOpenDropdown(null);
     setErrors({ ...errors, subCategory: "" });
   };
 
@@ -514,57 +515,93 @@ const GrievanceFormScreen = ({ navigation }) => {
           </Text>
 
           {/* Main Category Selection */}
-          <View style={styles.inputSection}>
+          <View style={[styles.inputSection, { zIndex: openDropdown === 'main' ? 100 : 1 }]}>
             <Text style={[styles.label, { fontSize: getResponsiveSize(14, screenWidth) }]}>
               Main Category *
             </Text>
-            <TouchableOpacity
-              style={[styles.pickerButton, errors.mainCategory && styles.inputError]}
-              onPress={() => setShowMainCategoryPicker(true)}
-              disabled={isSubmitting || isLoadingCategories}
-            >
-              <Text
+            <View style={styles.dropdownContainer}>
+              <TouchableOpacity
                 style={[
-                  styles.pickerText,
-                  !mainCategory && styles.placeholderText,
-                  { fontSize: getResponsiveSize(14, screenWidth) }
+                  styles.pickerButton,
+                  errors.mainCategory && styles.inputError,
+                  openDropdown === 'main' && styles.pickerButtonOpen,
                 ]}
+                onPress={() => !isSubmitting && !isLoadingCategories && setOpenDropdown(openDropdown === 'main' ? null : 'main')}
+                disabled={isSubmitting || isLoadingCategories}
               >
-                {isLoadingCategories 
-                  ? "Loading categories..."
-                  : (mainCategory ? getCategoryText(mainCategory, mainCategories) : "Choose a category")
-                }
-              </Text>
-              <Ionicons name="chevron-down" size={20} color="#6C63FF" />
-            </TouchableOpacity>
+                <Text style={[styles.pickerText, !mainCategory && styles.placeholderText, { fontSize: getResponsiveSize(14, screenWidth) }]}>
+                  {isLoadingCategories ? "Loading categories..." : (mainCategory ? getCategoryText(mainCategory, mainCategories) : "Choose a category")}
+                </Text>
+                <Ionicons name={openDropdown === 'main' ? "chevron-up" : "chevron-down"} size={20} color="#6C63FF" />
+              </TouchableOpacity>
+              {openDropdown === 'main' && (
+                <View style={styles.dropdownMenu}>
+                  <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                    {mainCategories.map((category) => {
+                      const isSelected = mainCategory === category.value;
+                      return (
+                        <TouchableOpacity
+                          key={category.id}
+                          style={[styles.dropdownItem, isSelected && { backgroundColor: '#EEF0FF' }]}
+                          onPress={() => handleMainCategorySelect(category)}
+                        >
+                          <Text style={[styles.dropdownItemText, isSelected && { color: '#6C63FF', fontWeight: '600' }]}>
+                            {category.text}
+                          </Text>
+                          {isSelected && <Ionicons name="checkmark-circle" size={18} color="#6C63FF" />}
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
             {errors.mainCategory && <Text style={styles.errorText}>{errors.mainCategory}</Text>}
           </View>
 
           {/* Sub-Category Selection */}
           {mainCategory && subCategories[mainCategory] && subCategories[mainCategory].length > 0 && (
-            <View style={styles.inputSection}>
+            <View style={[styles.inputSection, { zIndex: openDropdown === 'sub' ? 100 : 1 }]}>
               <Text style={[styles.label, { fontSize: getResponsiveSize(14, screenWidth) }]}>
                 Sub Category *
               </Text>
-              <TouchableOpacity
-                style={[styles.pickerButton, errors.subCategory && styles.inputError]}
-                onPress={() => setShowSubCategoryPicker(true)}
-                disabled={isSubmitting || isLoadingCategories}
-              >
-                <Text
+              <View style={styles.dropdownContainer}>
+                <TouchableOpacity
                   style={[
-                    styles.pickerText,
-                    !subCategory && styles.placeholderText,
-                    { fontSize: getResponsiveSize(14, screenWidth) }
+                    styles.pickerButton,
+                    errors.subCategory && styles.inputError,
+                    openDropdown === 'sub' && styles.pickerButtonOpen,
                   ]}
+                  onPress={() => !isSubmitting && !isLoadingCategories && setOpenDropdown(openDropdown === 'sub' ? null : 'sub')}
+                  disabled={isSubmitting || isLoadingCategories}
                 >
-                  {subCategory 
-                    ? getCategoryText(subCategory, subCategories[mainCategory] || [])
-                    : isLoadingCategories ? "Loading subcategories..." : "Choose sub category"
-                  }
-                </Text>
-                <Ionicons name="chevron-down" size={20} color="#6C63FF" />
-              </TouchableOpacity>
+                  <Text style={[styles.pickerText, !subCategory && styles.placeholderText, { fontSize: getResponsiveSize(14, screenWidth) }]}>
+                    {subCategory ? getCategoryText(subCategory, subCategories[mainCategory] || []) : "Choose sub category"}
+                  </Text>
+                  <Ionicons name={openDropdown === 'sub' ? "chevron-up" : "chevron-down"} size={20} color="#6C63FF" />
+                </TouchableOpacity>
+                {openDropdown === 'sub' && (
+                  <View style={styles.dropdownMenu}>
+                    <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                      {subCategories[mainCategory]?.map((category) => {
+                        const isSelected = subCategory === category.value;
+                        return (
+                          <TouchableOpacity
+                            key={category.id}
+                            style={[styles.dropdownItem, isSelected && { backgroundColor: '#EEF0FF' }]}
+                            onPress={() => handleSubCategorySelect(category)}
+                          >
+                            <Text style={[styles.dropdownItemText, isSelected && { color: '#6C63FF', fontWeight: '600' }]}>
+                              {category.text}
+                            </Text>
+                            {isSelected && <Ionicons name="checkmark-circle" size={18} color="#6C63FF" />}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
               {errors.subCategory && <Text style={styles.errorText}>{errors.subCategory}</Text>}
             </View>
           )}
@@ -644,53 +681,6 @@ const GrievanceFormScreen = ({ navigation }) => {
         </View>
       </ScrollView>
 
-      {/* Main Category Picker Modal */}
-      <Modal visible={showMainCategoryPicker} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowMainCategoryPicker(false)}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Main Category</Text>
-            <ScrollView style={styles.modalList}>
-              {mainCategories.map((category) => (
-                <TouchableOpacity
-                  key={category.id}
-                  style={styles.modalItem}
-                  onPress={() => handleMainCategorySelect(category)}
-                >
-                  <Text style={styles.modalItemText}>{category.text}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-
-      {/* Sub Category Picker Modal */}
-      <Modal visible={showSubCategoryPicker} transparent animationType="fade">
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowSubCategoryPicker(false)}
-        >
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Select Sub Category</Text>
-            <ScrollView style={styles.modalList}>
-              {mainCategory && subCategories[mainCategory]?.map((category) => (
-                <TouchableOpacity
-                  key={category.id}
-                  style={styles.modalItem}
-                  onPress={() => handleSubCategorySelect(category)}
-                >
-                  <Text style={styles.modalItemText}>{category.text}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </TouchableOpacity>
-      </Modal>
 
       {/* Date Picker */}
       {Platform.OS === 'ios' ? (
@@ -837,12 +827,54 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: "#F8F7FF",
   },
+  pickerButtonOpen: {
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    borderBottomColor: "#6C63FF",
+  },
   pickerText: {
     color: "#1A1A2E",
     flex: 1,
   },
   placeholderText: {
     color: "#9ca3af",
+  },
+  dropdownContainer: {
+    position: "relative",
+    zIndex: 999,
+  },
+  dropdownMenu: {
+    position: "absolute",
+    top: "100%",
+    left: 0,
+    right: 0,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#E8E6F0",
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+    maxHeight: 220,
+    elevation: 20,
+    shadowColor: "#4C1D95",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    zIndex: 9999,
+  },
+  dropdownItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 13,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F0EEF8",
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    color: "#1A1A2E",
+    flex: 1,
   },
   dateButton: {
     flexDirection: "row",
