@@ -1250,26 +1250,28 @@ export default function SubscribeMembershipScreen({ navigation }) {
             )}
 
           {/* Instructions */}
-          <View
-            style={[
-              styles.instructionsContainer,
-              {
-                marginHorizontal: getResponsivePadding(16, screenWidth),
-                marginBottom: getResponsivePadding(20, screenWidth),
-              },
-            ]}
-          >
-            <Text
+          {!loading && (
+            <View
               style={[
-                styles.instructionsText,
-                { fontSize: getResponsiveSize(12, screenWidth) },
+                styles.instructionsContainer,
+                {
+                  marginHorizontal: getResponsivePadding(16, screenWidth),
+                  marginBottom: getResponsivePadding(20, screenWidth),
+                },
               ]}
             >
-              Select your preferred membership and payment method, then click
-              the payment amount to proceed directly to payment. Your
-              application will be submitted automatically.
-            </Text>
-          </View>
+              <Text
+                style={[
+                  styles.instructionsText,
+                  { fontSize: getResponsiveSize(12, screenWidth) },
+                ]}
+              >
+                Select your preferred membership and payment method, then click
+                the payment amount to proceed directly to payment. Your
+                application will be submitted automatically.
+              </Text>
+            </View>
+          )}
 
           {/* General Error Display */}
           {errors.general && (
