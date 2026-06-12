@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getGrievancesAPI, getCategoriesAPI } from '../services/api';
 import GrievanceFormScreen from './GrievanceFormScreen';
 import { useTheme } from '../contexts/ThemeContext';
+import ScreenWrapper from '../components/ScreenWrapper';
 
 const GrievanceScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -246,9 +247,8 @@ const GrievanceScreen = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
-      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: "transparent" }]}>
+    <ScreenWrapper>
+      <View style={[styles.header, { backgroundColor: 'transparent', borderBottomColor: "transparent" }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={[styles.backButton, { backgroundColor: colors.primaryContainer || '#EEF0FF', width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' }]}
@@ -320,7 +320,7 @@ const GrievanceScreen = ({ navigation }) => {
           }}
         />
       </Modal>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 };
 

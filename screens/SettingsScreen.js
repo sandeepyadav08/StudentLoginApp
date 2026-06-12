@@ -15,6 +15,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../contexts/ThemeContext';
+import ScreenWrapper from '../components/ScreenWrapper';
 
 const { width } = Dimensions.get('window');
 
@@ -171,15 +172,14 @@ export default function SettingsScreen({ navigation }) {
   );
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? 'light' : 'dark'} />
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScreenWrapper>
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         {/* Header */}
         <View
           style={[
             styles.header,
             {
-              backgroundColor: colors.background,
+              backgroundColor: 'transparent',
               borderBottomColor: "transparent",
               paddingHorizontal: getResponsivePadding(16, screenWidth),
               paddingVertical: getResponsivePadding(15, screenWidth),
@@ -312,7 +312,7 @@ export default function SettingsScreen({ navigation }) {
           </View>
         </ScrollView>
       </View>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

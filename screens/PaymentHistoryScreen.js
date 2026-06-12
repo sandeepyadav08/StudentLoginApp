@@ -22,6 +22,7 @@ import { Picker } from "@react-native-picker/picker";
 import { getPaymentHistoryAPI, getPaymentDetailsAPI } from "../services/api";
 import { WebView } from "react-native-webview";
 import { useTheme } from "../contexts/ThemeContext";
+import ScreenWrapper from '../components/ScreenWrapper';
 
 // Responsive utility functions
 const getResponsiveSize = (baseSize, screenWidth) => {
@@ -42,6 +43,7 @@ export default function PaymentHistoryScreen({ navigation }) {
 
   const [paymentHistory, setPaymentHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filterLoading, setFilterLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
@@ -56,12 +58,18 @@ export default function PaymentHistoryScreen({ navigation }) {
   const [paymentDetails, setPaymentDetails] = useState(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
 
+  // Initial mount - show full loader
+  useEffect(() => {
+    loadPaymentHistory("", true, true);
+  }, []);
+
+  // Filter change - show full loader
   useEffect(() => {
     setCurrentPage(0);
     setHasMore(true);
     setPaymentHistory([]);
     setLoading(true);
-    loadPaymentHistory(statusFilter, true);
+    loadPaymentHistory(statusFilter, true, false);
   }, [statusFilter]);
 
   useEffect(() => {
@@ -72,9 +80,11 @@ export default function PaymentHistoryScreen({ navigation }) {
     return unsubscribe;
   }, [navigation]);
 
-  const loadPaymentHistory = async (filter = "", reset = true) => {
+  const loadPaymentHistory = async (filter = "", reset = true, showFullLoader = false) => {
     try {
       setError(null);
+      if (showFullLoader) setLoading(true);
+      setFilterLoading(true);
       const token = await AsyncStorage.getItem("userToken");
 
       if (!token) {
@@ -112,6 +122,7 @@ export default function PaymentHistoryScreen({ navigation }) {
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      setFilterLoading(false);
     }
   };
 
@@ -497,14 +508,13 @@ export default function PaymentHistoryScreen({ navigation }) {
 
   if (loading && !refreshing) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-        <StatusBar style={isDark ? "light" : "dark"} />
-        <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ScreenWrapper>
+        <View style={[styles.container, { backgroundColor: 'transparent' }]}>
           <View
             style={[
               styles.header,
               {
-                backgroundColor: colors.background,
+                backgroundColor: 'transparent',
                 borderBottomColor: "transparent",
                 paddingHorizontal: getResponsivePadding(16, screenWidth),
                 paddingVertical: getResponsivePadding(15, screenWidth),
@@ -546,20 +556,19 @@ export default function PaymentHistoryScreen({ navigation }) {
             </Text>
           </View>
         </View>
-      </SafeAreaView>
+      </ScreenWrapper>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScreenWrapper>
+      <View style={[styles.container, { backgroundColor: 'transparent' }]}>
         {/* Header */}
         <View
           style={[
             styles.header,
             {
-              backgroundColor: colors.background,
+              backgroundColor: 'transparent',
               borderBottomColor: "transparent",
               paddingHorizontal: getResponsivePadding(16, screenWidth),
               paddingVertical: getResponsivePadding(15, screenWidth),
@@ -592,99 +601,108 @@ export default function PaymentHistoryScreen({ navigation }) {
         </View>
 
         {/* Custom Filter Dropdown */}
-        <View
-          style={{
-            paddingHorizontal: 16,
-            paddingVertical: 10,
-            backgroundColor: colors.background,
-            borderBottomWidth: 0,
-            zIndex: 1000,
-          }}
-        >
-          <TouchableOpacity
-            style={{
-              flexDirection: 'row',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              paddingHorizontal: 12,
-              paddingVertical: 12,
-              backgroundColor: colors.surface,
-              borderWidth: 1,
-              borderColor: colors.border,
-              borderRadius: 12,
-            }}
-            onPress={() => setShowFilterDropdown(!showFilterDropdown)}
-          >
-            <Text style={{ color: colors.text, fontSize: 16 }}>
-              {statusFilter === "" ? "All" : 
-               statusFilter === "0" ? "Pending" :
-               statusFilter === "1" ? "Success" :
-               statusFilter === "2" ? "Fail" :
-               statusFilter === "3" ? "Processing" : "All"}
-            </Text>
-            <Ionicons 
-              name={showFilterDropdown ? "chevron-up" : "chevron-down"} 
-              size={20} 
-              color={colors.textSecondary} 
-            />
-          </TouchableOpacity>
-          
-          {showFilterDropdown && (
-            <View
+        <View style={{ paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10, zIndex: 1000 }}>
+          <View style={{ position: 'relative' }}>
+            {/* Trigger */}
+            <TouchableOpacity
               style={{
-                position: 'absolute',
-                top: '100%',
-                left: 16,
-                right: 16,
-                backgroundColor: colors.surface,
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                paddingHorizontal: 16,
+                paddingVertical: 14,
+                backgroundColor: '#fff',
                 borderWidth: 1,
-                borderColor: colors.border,
-                borderTopWidth: 0,
-                borderBottomLeftRadius: 8,
-                borderBottomRightRadius: 8,
-                elevation: 5,
+                borderColor: 'rgba(108,99,255,0.3)',
+                borderTopLeftRadius: 12,
+                borderTopRightRadius: 12,
+                borderBottomLeftRadius: showFilterDropdown ? 0 : 12,
+                borderBottomRightRadius: showFilterDropdown ? 0 : 12,
+                borderBottomWidth: showFilterDropdown ? 0 : 1,
                 shadowColor: '#000',
                 shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.1,
+                shadowOpacity: 0.06,
                 shadowRadius: 4,
-                zIndex: 1001,
+                elevation: 2,
               }}
+              onPress={() => setShowFilterDropdown(!showFilterDropdown)}
+              activeOpacity={0.7}
             >
-              {[
-                { label: "All", value: "" },
-                { label: "Pending", value: "0" },
-                { label: "Success", value: "1" },
-                { label: "Fail", value: "2" },
-                { label: "Processing", value: "3" },
-              ].map((item, index, array) => (
-                <TouchableOpacity
-                  key={item.value}
-                  style={{
-                    paddingHorizontal: 12,
-                    paddingVertical: 12,
-                    borderBottomWidth: index < array.length - 1 ? 1 : 0,
-                    borderBottomColor: colors.border,
-                    backgroundColor: statusFilter === item.value ? colors.primaryContainer : 'transparent',
-                  }}
-                  onPress={() => {
-                    setStatusFilter(item.value);
-                    setShowFilterDropdown(false);
-                  }}
-                >
-                  <Text 
-                    style={{ 
-                      color: statusFilter === item.value ? colors.primary : colors.text,
-                      fontSize: 16,
-                      fontWeight: statusFilter === item.value ? '600' : '400',
+              <Text style={{ color: colors.text, fontSize: 15 }}>
+                {statusFilter === "" ? "All" :
+                 statusFilter === "0" ? "Pending" :
+                 statusFilter === "1" ? "Success" :
+                 statusFilter === "2" ? "Fail" :
+                 statusFilter === "3" ? "Processing" : "All"}
+              </Text>
+              <Ionicons
+                name={showFilterDropdown ? "chevron-up" : "chevron-down"}
+                size={20}
+                color={colors.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {/* Floating Options — absolute so they don't push layout */}
+            {showFilterDropdown && (
+              <View style={{
+                position: 'absolute',
+                top: '100%',
+                left: 0,
+                right: 0,
+                backgroundColor: '#fff',
+                borderWidth: 1,
+                borderTopWidth: 0,
+                borderColor: 'rgba(108,99,255,0.3)',
+                borderBottomLeftRadius: 12,
+                borderBottomRightRadius: 12,
+                zIndex: 999,
+                elevation: 6,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.1,
+                shadowRadius: 6,
+              }}>
+                {[
+                  { label: "All", value: "" },
+                  { label: "Pending", value: "0" },
+                  { label: "Success", value: "1" },
+                  { label: "Fail", value: "2" },
+                  { label: "Processing", value: "3" },
+                ].map((item, index, array) => (
+                  <TouchableOpacity
+                    key={item.value}
+                    style={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 14,
+                      borderBottomWidth: index < array.length - 1 ? 1 : 0,
+                      borderBottomColor: 'rgba(108,99,255,0.08)',
                     }}
+                    onPress={() => {
+                      setStatusFilter(item.value);
+                      setShowFilterDropdown(false);
+                    }}
+                    activeOpacity={0.6}
                   >
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
+                    <Text style={{
+                      color: statusFilter === item.value ? '#6C63FF' : colors.text,
+                      fontSize: 15,
+                    }}>
+                      {item.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </View>
         </View>
+
+        {/* Filter loading indicator */}
+        {filterLoading && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8 }}>
+            <ActivityIndicator size="small" color="#6C63FF" />
+            <Text style={{ marginLeft: 8, fontSize: 13, color: '#6C63FF' }}>Filtering...</Text>
+          </View>
+        )}
 
         {/* Content */}
         {error && !refreshing ? (
@@ -729,7 +747,7 @@ export default function PaymentHistoryScreen({ navigation }) {
         {/* Payment Details Modal */}
         {renderPaymentDetailsModal()}
       </View>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

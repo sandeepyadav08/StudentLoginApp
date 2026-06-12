@@ -17,6 +17,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../contexts/ThemeContext";
+import ScreenWrapper from '../components/ScreenWrapper';
 import {
   getUtilityAmountAPI,
   saveUtilityRequestAPI,
@@ -653,16 +654,14 @@ export default function SubscribeMembershipScreen({ navigation }) {
   }, []);
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
+    <ScreenWrapper>
       <StatusBar style={isDark ? "light" : "dark"} />
       {/* Header */}
       <View
         style={[
           styles.header,
           {
-            backgroundColor: colors.background,
+            backgroundColor: 'transparent',
             borderBottomColor: "transparent",
             paddingHorizontal: getResponsivePadding(16, screenWidth),
             paddingVertical: getResponsivePadding(15, screenWidth),
@@ -719,7 +718,7 @@ export default function SubscribeMembershipScreen({ navigation }) {
                 style={[
                   styles.serviceSection,
                   {
-                    backgroundColor: colors.surface,
+                    backgroundColor: 'rgba(255,255,255,0.75)',
                     padding: getResponsivePadding(20, screenWidth),
                     marginBottom: 16,
                     zIndex: openDropdown === utility.id ? 100 : 1,
@@ -1147,7 +1146,7 @@ export default function SubscribeMembershipScreen({ navigation }) {
               style={[
                 styles.serviceSection,
                 {
-                  backgroundColor: colors.surface,
+                  backgroundColor: 'rgba(255,255,255,0.75)',
                   padding: getResponsivePadding(20, screenWidth),
                   marginBottom: 16,
                 },
@@ -1390,7 +1389,7 @@ export default function SubscribeMembershipScreen({ navigation }) {
           </TouchableOpacity>
         </TouchableOpacity>
       </Modal>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 
@@ -1443,7 +1442,7 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 28,
     height: 28,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: "#E8E6F0",
     backgroundColor: "#ffffff",
@@ -1477,7 +1476,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1,
     borderColor: "#E8E6F0",
-    borderRadius: 8,
+    borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 12,
     backgroundColor: "#F8F7FF",
@@ -1576,7 +1575,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     backgroundColor: "#dbeafe",
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 16,
   },
   amountText: {
@@ -1596,7 +1595,7 @@ const styles = StyleSheet.create({
   departmentDetails: {
     backgroundColor: "#f8fafc",
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     marginTop: 16,
   },
   departmentTitle: {

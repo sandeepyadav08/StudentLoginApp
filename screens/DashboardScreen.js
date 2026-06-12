@@ -15,6 +15,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { getDashboardData, readUserAPI } from "../services/api";
 import { useTheme } from "../contexts/ThemeContext";
+import ScreenWrapper from '../components/ScreenWrapper';
 
 const { width } = Dimensions.get("window");
 
@@ -116,59 +117,21 @@ export default function DashboardScreen({ navigation }) {
   };
 
   const StatCard = ({ title, count, color, icon }) => {
-    // Create theme-aware background colors
-    const bgColor = isDark 
-      ? `${color.icon}15` // 15 is hex for ~8% opacity
-      : color.bg;
-      
+    const bgColor = isDark ? `${color.icon}15` : color.bg;
     return (
       <View
         style={[
           styles.statCard,
-          {
-            backgroundColor: bgColor,
-            padding: getResponsivePadding(16, screenWidth),
-            // Add subtle border in dark mode for better definition
-            ...(isDark && {
-              borderWidth: 1,
-              borderColor: `${color.icon}30`, // 30 is hex for ~19% opacity
-            }),
-          },
+          { backgroundColor: bgColor, padding: getResponsivePadding(16, screenWidth) },
         ]}
       >
         <View style={styles.statIcon}>
-          <Ionicons
-            name={icon}
-            size={screenWidth < 350 ? 20 : 24}
-            color={color.icon}
-          />
+          <Ionicons name={icon} size={screenWidth < 350 ? 20 : 24} color={color.icon} />
         </View>
-        <Text
-          style={[
-            styles.statCount,
-            { 
-              color: colors.text,
-              fontSize: getResponsiveSize(28, screenWidth),
-              // Add text shadow in dark mode for better visibility
-              ...(isDark && {
-                textShadowColor: 'rgba(0, 0, 0, 0.5)',
-                textShadowOffset: { width: 1, height: 1 },
-                textShadowRadius: 2,
-              }),
-            },
-          ]}
-        >
+        <Text style={[styles.statCount, { color: colors.text, fontSize: getResponsiveSize(28, screenWidth) }]}>
           {count}
         </Text>
-        <Text
-          style={[
-            styles.statTitle,
-            { 
-              color: colors.textSecondary,
-              fontSize: getResponsiveSize(12, screenWidth) 
-            },
-          ]}
-        >
+        <Text style={[styles.statTitle, { color: colors.textSecondary, fontSize: getResponsiveSize(12, screenWidth) }]}>
           {title}
         </Text>
       </View>
@@ -260,15 +223,14 @@ export default function DashboardScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <ScreenWrapper>
+      <View style={[styles.container, { backgroundColor: 'transparent', zIndex: 1 }]}>
         {/* Header */}
         <View
           style={[
             styles.header,
             {
-              backgroundColor: colors.background,
+              backgroundColor: 'transparent',
               borderBottomColor: "transparent",
               paddingHorizontal: getResponsivePadding(16, screenWidth),
               paddingVertical: getResponsivePadding(15, screenWidth),
@@ -368,28 +330,19 @@ export default function DashboardScreen({ navigation }) {
             <StatCard
               title="Grievance"
               count={dashboardData.grievance}
-              color={{
-                bg: "#dcfce7",
-                icon: "#16a34a",
-              }}
+              color={{ bg: "#dcfce7", icon: "#16a34a" }}
               icon="alert-circle-outline"
             />
             <StatCard
               title="Ticket"
               count={dashboardData.ticket}
-              color={{
-                bg: "#dbeafe",
-                icon: "#2563eb",
-              }}
+              color={{ bg: "#dbeafe", icon: "#2563eb" }}
               icon="ticket-outline"
             />
             <StatCard
               title="Utility"
               count={dashboardData.utility}
-              color={{
-                bg: "#fef3c7",
-                icon: "#d97706",
-              }}
+              color={{ bg: "#fef3c7", icon: "#d97706" }}
               icon="construct-outline"
             />
           </View>
@@ -482,7 +435,7 @@ export default function DashboardScreen({ navigation }) {
           </View>
         </ScrollView>
       </View>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

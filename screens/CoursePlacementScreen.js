@@ -14,6 +14,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../contexts/ThemeContext";
+import ScreenWrapper from '../components/ScreenWrapper';
 import {
   getCourseAndPlacementFeeAPI,
   saveUtilityRequestAPI,
@@ -365,7 +366,7 @@ export default function CoursePlacementScreen({ navigation }) {
     return courseData.utility_list.map((course) => (
       <View
         key={course.id}
-        style={[styles.serviceSection, { backgroundColor: colors.surface, zIndex: openDropdown === course.id ? 100 : 1 }]}
+        style={[styles.serviceSection, { backgroundColor: 'rgba(255,255,255,0.75)', zIndex: openDropdown === course.id ? 100 : 1 }]}
       >
         {/* Course Header */}
         <View style={styles.sectionHeader}>
@@ -513,16 +514,14 @@ export default function CoursePlacementScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
+    <ScreenWrapper>
       <StatusBar style={isDark ? "light" : "dark"} />
       {/* Header */}
       <View
         style={[
           styles.header,
           {
-            backgroundColor: colors.background,
+            backgroundColor: 'transparent',
             borderBottomColor: "transparent",
             paddingHorizontal: 16,
             paddingVertical: 15,
@@ -579,7 +578,7 @@ export default function CoursePlacementScreen({ navigation }) {
                 <View
                   style={[
                     styles.serviceSection,
-                    { backgroundColor: colors.surface },
+                    { backgroundColor: 'rgba(255,255,255,0.75)' },
                   ]}
                 >
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -701,7 +700,7 @@ export default function CoursePlacementScreen({ navigation }) {
         </View>
       </ScrollView>
 
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 

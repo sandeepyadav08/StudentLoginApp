@@ -14,6 +14,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useTheme } from "../contexts/ThemeContext";
+import ScreenWrapper from '../components/ScreenWrapper';
 import { getHostelAndIdFeeAPI, saveUtilityRequestAPI } from "../services/api";
 
 const { width } = Dimensions.get("window");
@@ -373,7 +374,7 @@ export default function HostelIdFeeScreen({ navigation }) {
     return hostelData.utility_list.map((hostel) => (
       <View
         key={hostel.id}
-        style={[styles.serviceSection, { backgroundColor: colors.surface, zIndex: openDropdown === hostel.id ? 100 : 1 }]}
+        style={[styles.serviceSection, { backgroundColor: 'rgba(255,255,255,0.75)', zIndex: openDropdown === hostel.id ? 100 : 1 }]}
       >
         {/* Hostel Header */}
         <View style={styles.sectionHeader}>
@@ -526,16 +527,13 @@ export default function HostelIdFeeScreen({ navigation }) {
   };
 
   return (
-    <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
-    >
-      <StatusBar style={isDark ? "light" : "dark"} />
+    <ScreenWrapper>
       {/* Header */}
       <View
         style={[
           styles.header,
           {
-            backgroundColor: colors.background,
+            backgroundColor: 'transparent',
             borderBottomColor: "transparent",
             paddingHorizontal: 16,
             paddingVertical: 15,
@@ -596,7 +594,7 @@ export default function HostelIdFeeScreen({ navigation }) {
                 <View
                   style={[
                     styles.serviceSection,
-                    { backgroundColor: colors.surface },
+                    { backgroundColor: 'rgba(255,255,255,0.75)' },
                   ]}
                 >
                   <Text style={[styles.sectionTitle, { color: colors.text }]}>
@@ -718,7 +716,7 @@ export default function HostelIdFeeScreen({ navigation }) {
           )}
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 }
 
@@ -772,7 +770,7 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 28,
     height: 28,
-    borderRadius: 8,
+    borderRadius: 12,
     borderWidth: 2,
     borderColor: "#E8E6F0",
     backgroundColor: "#ffffff",

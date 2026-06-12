@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getHelpdeskTicketsAPI, getCategoriesAPI } from '../services/api';
 import HelpdeskFormScreen from './HelpdeskFormScreen';
 import { useTheme } from '../contexts/ThemeContext';
+import ScreenWrapper from '../components/ScreenWrapper';
 
 const HelpdeskScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -246,9 +247,8 @@ const HelpdeskScreen = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar style={isDark ? "light" : "dark"} />
-      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: "transparent" }]}>
+    <ScreenWrapper>
+      <View style={[styles.header, { backgroundColor: 'transparent', borderBottomColor: "transparent" }]}>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={[styles.backButton, { backgroundColor: colors.primaryContainer || '#EEF0FF', width: 38, height: 38, borderRadius: 19, justifyContent: 'center', alignItems: 'center' }]}
@@ -318,7 +318,7 @@ const HelpdeskScreen = ({ navigation }) => {
           }}
         />
       </Modal>
-    </SafeAreaView>
+    </ScreenWrapper>
   );
 };
 
