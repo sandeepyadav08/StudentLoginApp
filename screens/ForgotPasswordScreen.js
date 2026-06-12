@@ -13,16 +13,20 @@ import { forgotPasswordAPI } from '../services/api';
 import FloatingInput from '../components/FloatingInput';
 
 const { width, height } = Dimensions.get('window');
+const isIOS = Platform.OS === 'ios';
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function ForgotPasswordScreen({ navigation }) {
   const [email, setEmail]     = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors]   = useState({});
+  const [entered, setEntered] = useState(false);
 
   const iconScale   = useRef(new Animated.Value(0)).current;
   const iconOpacity = useRef(new Animated.Value(0)).current;
   const cardY       = useRef(new Animated.Value(50)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
+  const cardElev    = useRef(new Animated.Value(0)).current; // Android shadow fade (0 → 1)
   const btnScale    = useRef(new Animated.Value(1)).current;
   const shakeX      = useRef(new Animated.Value(0)).current;
 
@@ -31,9 +35,10 @@ export default function ForgotPasswordScreen({ navigation }) {
       Animated.parallel([
         Animated.spring(iconScale,   { toValue: 1, tension: 55, friction: 7, useNativeDriver: true }),
         Animated.timing(iconOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
-        Animated.timing(cardY,       { toValue: 0, duration: 600, delay: 100, useNativeDriver: true }),
-        Animated.timing(cardOpacity, { toValue: 1, duration: 550, delay: 100, useNativeDriver: true }),
-      ]).start();
+        Animated.timing(cardY,       { toValue: 0, duration: 600, delay: 100, useNativeDriver: isIOS }),
+        Animated.timing(cardOpacity, { toValue: 1, duration: 550, delay: 100, useNativeDriver: isIOS }),
+        Animated.timing(cardElev,    { toValue: 1, duration: 550, delay: 100, useNativeDriver: false }),
+      ]).start(() => setEntered(true));
     });
 
     return () => task.cancel();
@@ -41,11 +46,11 @@ export default function ForgotPasswordScreen({ navigation }) {
 
   const shakeCard = () => {
     Animated.sequence([
-      Animated.timing(shakeX, { toValue: 10,  duration: 55, useNativeDriver: true }),
-      Animated.timing(shakeX, { toValue: -10, duration: 55, useNativeDriver: true }),
-      Animated.timing(shakeX, { toValue: 7,   duration: 55, useNativeDriver: true }),
-      Animated.timing(shakeX, { toValue: -7,  duration: 55, useNativeDriver: true }),
-      Animated.timing(shakeX, { toValue: 0,   duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 10,  duration: 55, useNativeDriver: isIOS }),
+      Animated.timing(shakeX, { toValue: -10, duration: 55, useNativeDriver: isIOS }),
+      Animated.timing(shakeX, { toValue: 7,   duration: 55, useNativeDriver: isIOS }),
+      Animated.timing(shakeX, { toValue: -7,  duration: 55, useNativeDriver: isIOS }),
+      Animated.timing(shakeX, { toValue: 0,   duration: 55, useNativeDriver: isIOS }),
     ]).start();
   };
 
@@ -77,6 +82,12 @@ export default function ForgotPasswordScreen({ navigation }) {
       }
     });
   };
+
+  // Android: elevation shadow opacity ke saath fade nahi hota — isliye elevation ko hi card ke fade ke saath animate karo
+  const cardShadow = isIOS ? null : { elevation: cardElev.interpolate({ inputRange: [0, 1], outputRange: [0, 12] }) };
+  const btnShadow  = isIOS ? null : { elevation: cardElev.interpolate({ inputRange: [0, 1], outputRange: [0, 8] }) };
+  // Android par icon ka purple elevation glow star jaisa dikhta hai — wahan shadow band
+  const iconShadow = isIOS ? null : { elevation: 0 };
 
   return (
     <SafeAreaView style={s.safe}>
@@ -119,18 +130,21 @@ export default function ForgotPasswordScreen({ navigation }) {
       </View>
 
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
             contentContainerStyle={s.scroll}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
             {/* Icon */}
-            <Animated.View style={[s.iconSection, { opacity: iconOpacity, transform: [{ scale: iconScale }] }]}>
+            <Animated.View
+              style={[s.iconSection, { opacity: iconOpacity, transform: [{ scale: iconScale }] }]}
+              renderToHardwareTextureAndroid={!entered}
+            >
               <View style={s.iconRing}>
-                <View style={s.iconCircle}>
+                <Animated.View style={[s.iconCircle, iconShadow]}>
                   <Ionicons name="mail-unread-outline" size={34} color="#FFFFFF" />
-                </View>
+                </Animated.View>
               </View>
               <Text style={s.screenTitle}>Forgot Password?</Text>
               <Text style={s.screenSub}>No worries, we'll send you a reset code</Text>
@@ -138,10 +152,11 @@ export default function ForgotPasswordScreen({ navigation }) {
 
             {/* Card */}
             <Animated.View
-              style={[s.card, {
+              style={[s.card, cardShadow, {
                 opacity: cardOpacity,
                 transform: [{ translateY: cardY }, { translateX: shakeX }],
               }]}
+              renderToHardwareTextureAndroid={!entered}
             >
               <Text style={s.cardTitle}>Enter your email</Text>
               <Text style={s.cardSub}>We'll send a 6-digit OTP to verify your identity</Text>
@@ -160,8 +175,8 @@ export default function ForgotPasswordScreen({ navigation }) {
 
               {/* Send OTP Button */}
               <Animated.View style={{ transform: [{ scale: btnScale }], marginTop: 10 }}>
-                <TouchableOpacity
-                  style={[s.btn, loading && s.btnOff]}
+                <AnimatedTouchable
+                  style={[s.btn, btnShadow, loading && s.btnOff]}
                   onPress={handleSend}
                   disabled={loading}
                   activeOpacity={0.9}
@@ -176,7 +191,7 @@ export default function ForgotPasswordScreen({ navigation }) {
                       </View>
                     </View>
                   )}
-                </TouchableOpacity>
+                </AnimatedTouchable>
               </Animated.View>
 
               {/* Back to Login */}

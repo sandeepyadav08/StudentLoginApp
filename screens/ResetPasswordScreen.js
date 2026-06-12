@@ -11,6 +11,8 @@ import { Ionicons } from '@expo/vector-icons';
 import FloatingInput from '../components/FloatingInput';
 
 const { width, height } = Dimensions.get('window');
+const isIOS = Platform.OS === 'ios';
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 const getStrength = (pw) => {
   if (!pw)             return { label: '',       color: '#E2E8F0', pct: '0%'  };
@@ -31,10 +33,12 @@ export default function ResetPasswordScreen({ navigation, route }) {
   const [showConfirm, setShowConfirm]         = useState(false);
   const [loading, setLoading]                 = useState(false);
   const [errors, setErrors]                   = useState({});
+  const [entered, setEntered]                 = useState(false);
 
   const iconScale   = useRef(new Animated.Value(0)).current;
   const cardY       = useRef(new Animated.Value(50)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
+  const cardElev    = useRef(new Animated.Value(0)).current; // Android shadow fade (0 → 1)
   const btnScale    = useRef(new Animated.Value(1)).current;
   const shakeX      = useRef(new Animated.Value(0)).current;
   const orb1Y       = useRef(new Animated.Value(0)).current;
@@ -51,9 +55,10 @@ export default function ResetPasswordScreen({ navigation, route }) {
     const task = InteractionManager.runAfterInteractions(() => {
       Animated.parallel([
         Animated.spring(iconScale,   { toValue: 1, tension: 55, friction: 7, useNativeDriver: true }),
-        Animated.timing(cardY,       { toValue: 0, duration: 600, delay: 100, useNativeDriver: true }),
-        Animated.timing(cardOpacity, { toValue: 1, duration: 550, delay: 100, useNativeDriver: true }),
-      ]).start();
+        Animated.timing(cardY,       { toValue: 0, duration: 600, delay: 100, useNativeDriver: isIOS }),
+        Animated.timing(cardOpacity, { toValue: 1, duration: 550, delay: 100, useNativeDriver: isIOS }),
+        Animated.timing(cardElev,    { toValue: 1, duration: 550, delay: 100, useNativeDriver: false }),
+      ]).start(() => setEntered(true));
 
       const loop = (anim, dur, delay = 0) =>
         Animated.loop(
@@ -77,11 +82,11 @@ export default function ResetPasswordScreen({ navigation, route }) {
 
   const shakeCard = () => {
     Animated.sequence([
-      Animated.timing(shakeX, { toValue: 10,  duration: 55, useNativeDriver: true }),
-      Animated.timing(shakeX, { toValue: -10, duration: 55, useNativeDriver: true }),
-      Animated.timing(shakeX, { toValue: 7,   duration: 55, useNativeDriver: true }),
-      Animated.timing(shakeX, { toValue: -7,  duration: 55, useNativeDriver: true }),
-      Animated.timing(shakeX, { toValue: 0,   duration: 55, useNativeDriver: true }),
+      Animated.timing(shakeX, { toValue: 10,  duration: 55, useNativeDriver: isIOS }),
+      Animated.timing(shakeX, { toValue: -10, duration: 55, useNativeDriver: isIOS }),
+      Animated.timing(shakeX, { toValue: 7,   duration: 55, useNativeDriver: isIOS }),
+      Animated.timing(shakeX, { toValue: -7,  duration: 55, useNativeDriver: isIOS }),
+      Animated.timing(shakeX, { toValue: 0,   duration: 55, useNativeDriver: isIOS }),
     ]).start();
   };
 
@@ -129,6 +134,12 @@ export default function ResetPasswordScreen({ navigation, route }) {
   const orb2T     = orb2Y.interpolate({ inputRange: [0, 1], outputRange: [0, -18] });
   const barWidth  = strengthW.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
+  // Android: elevation shadow opacity ke saath fade nahi hota — isliye elevation ko hi card ke fade ke saath animate karo
+  const cardShadow = isIOS ? null : { elevation: cardElev.interpolate({ inputRange: [0, 1], outputRange: [0, 12] }) };
+  const btnShadow  = isIOS ? null : { elevation: cardElev.interpolate({ inputRange: [0, 1], outputRange: [0, 8] }) };
+  // Android par icon ka purple elevation glow star jaisa dikhta hai — wahan shadow band
+  const iconShadow = isIOS ? null : { elevation: 0 };
+
   return (
     <SafeAreaView style={s.safe}>
       <StatusBar style="dark" />
@@ -141,7 +152,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
       </View>
 
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
             contentContainerStyle={s.scroll}
             showsVerticalScrollIndicator={false}
@@ -155,11 +166,14 @@ export default function ResetPasswordScreen({ navigation, route }) {
             </TouchableOpacity>
 
             {/* Icon */}
-            <Animated.View style={[s.iconSection, { transform: [{ scale: iconScale }] }]}>
+            <Animated.View
+              style={[s.iconSection, { transform: [{ scale: iconScale }] }]}
+              renderToHardwareTextureAndroid={!entered}
+            >
               <View style={s.iconRing}>
-                <View style={s.iconCircle}>
+                <Animated.View style={[s.iconCircle, iconShadow]}>
                   <Ionicons name="key-outline" size={34} color="#FFFFFF" />
-                </View>
+                </Animated.View>
               </View>
               <Text style={s.screenTitle}>Reset Password</Text>
               <Text style={s.screenSub}>Create a strong new password for</Text>
@@ -168,10 +182,11 @@ export default function ResetPasswordScreen({ navigation, route }) {
 
             {/* Card */}
             <Animated.View
-              style={[s.card, {
+              style={[s.card, cardShadow, {
                 opacity: cardOpacity,
                 transform: [{ translateY: cardY }, { translateX: shakeX }],
               }]}
+              renderToHardwareTextureAndroid={!entered}
             >
               <Text style={s.cardTitle}>New Password</Text>
               <Text style={s.cardSub}>Must be at least 8 characters</Text>
@@ -238,8 +253,8 @@ export default function ResetPasswordScreen({ navigation, route }) {
 
               {/* Reset Button */}
               <Animated.View style={{ transform: [{ scale: btnScale }] }}>
-                <TouchableOpacity
-                  style={[s.btn, loading && s.btnOff]}
+                <AnimatedTouchable
+                  style={[s.btn, btnShadow, loading && s.btnOff]}
                   onPress={handleReset}
                   disabled={loading}
                   activeOpacity={0.9}
@@ -254,7 +269,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
                       </View>
                     </View>
                   )}
-                </TouchableOpacity>
+                </AnimatedTouchable>
               </Animated.View>
 
               {/* Back to Login */}

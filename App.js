@@ -6,7 +6,7 @@ import {
 } from "@react-navigation/native";
 import { createStackNavigator } from "@react-navigation/stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { StatusBar, Platform } from "react-native";
+import { StatusBar, Platform, useColorScheme } from "react-native";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
 import ErrorBoundary from "./components/ErrorBoundary";
 import LoginScreen from "./screens/LoginScreen";
@@ -174,8 +174,10 @@ function AppNavigator() {
 }
 
 export default function App() {
+  const colorScheme = useColorScheme();
+  const rootBg = colorScheme === 'dark' ? '#12111F' : '#F5F3FF';
   return (
-    <SafeAreaProvider style={{ backgroundColor: "#1a1a1a" }}>
+    <SafeAreaProvider style={{ backgroundColor: rootBg }}>
       <ErrorBoundary>
         <ThemeProvider>
           <AppNavigator />

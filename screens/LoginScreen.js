@@ -14,7 +14,6 @@ import {
   ActivityIndicator,
   TouchableWithoutFeedback,
   Keyboard,
-  InteractionManager,
 } from 'react-native';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,6 +24,8 @@ import { loginAPI } from '../services/api';
 import FloatingInput from '../components/FloatingInput';
 
 const { width, height } = Dimensions.get('window');
+const isIOS = Platform.OS === 'ios';
+const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function LoginScreen({ navigation }) {
@@ -34,6 +35,7 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading]         = useState(false);
   const [errors, setErrors]           = useState({});
   const [rememberMe, setRememberMe]   = useState(false);
+  const [entered, setEntered]         = useState(false);
 
   // Animations
   const logoScale   = useRef(new Animated.Value(0)).current;
@@ -45,10 +47,7 @@ export default function LoginScreen({ navigation }) {
 
   useEffect(() => {
     loadSaved();
-    const task = InteractionManager.runAfterInteractions(() => {
-      runEntrance();
-    });
-    return () => task.cancel();
+    runEntrance();
   }, []);
 
   const runEntrance = () => {
@@ -57,7 +56,7 @@ export default function LoginScreen({ navigation }) {
       Animated.timing(logoOpacity, { toValue: 1, duration: 500, useNativeDriver: true }),
       Animated.timing(cardY,       { toValue: 0, duration: 650, delay: 150, useNativeDriver: true }),
       Animated.timing(cardOpacity, { toValue: 1, duration: 600, delay: 150, useNativeDriver: true }),
-    ]).start();
+    ]).start(() => setEntered(true));
   };
 
 const shakeCard = () => {
@@ -125,6 +124,9 @@ const shakeCard = () => {
     });
   };
 
+  // Android par logo ka purple elevation glow star jaisa dikhta hai — wahan shadow band
+  const logoShadow = isIOS ? null : { elevation: 0 };
+
   return (
     <SafeAreaView style={s.safe}>
       <StatusBar style="dark" />
@@ -171,22 +173,25 @@ const shakeCard = () => {
       </View>
 
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
             contentContainerStyle={s.scroll}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
             {/* ── Brand / Logo ── */}
-            <Animated.View style={[s.brand, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}>
+            <Animated.View
+              style={[s.brand, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}
+              renderToHardwareTextureAndroid={!entered}
+            >
               <View style={s.logoRing}>
-                <View style={s.logoCircle}>
+                <Animated.View style={[s.logoCircle, logoShadow]}>
                   <Image
                     source={require('../assets/iimt_logo_icon.png')}
                     style={s.logoImage}
                     resizeMode="contain"
                   />
-                </View>
+                </Animated.View>
               </View>
               <Text style={s.appName}>IIMT Portal</Text>
               <Text style={s.tagline}>Your academic journey starts here</Text>
@@ -198,6 +203,7 @@ const shakeCard = () => {
                 opacity: cardOpacity,
                 transform: [{ translateY: cardY }, { translateX: shakeX }],
               }]}
+              renderToHardwareTextureAndroid={!entered}
             >
               {/* Card Header */}
               <View style={s.cardHeader}>
@@ -247,7 +253,7 @@ const shakeCard = () => {
 
               {/* Sign In Button */}
               <Animated.View style={{ transform: [{ scale: btnScale }] }}>
-                <TouchableOpacity
+                <AnimatedTouchable
                   style={[s.btn, loading && s.btnOff]}
                   onPress={handleLogin}
                   disabled={loading}
@@ -263,7 +269,7 @@ const shakeCard = () => {
                       </View>
                     </View>
                   )}
-                </TouchableOpacity>
+                </AnimatedTouchable>
               </Animated.View>
 
             </Animated.View>
