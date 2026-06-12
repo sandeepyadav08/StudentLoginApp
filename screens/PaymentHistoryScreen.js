@@ -63,12 +63,11 @@ export default function PaymentHistoryScreen({ navigation }) {
     loadPaymentHistory("", true, true);
   }, []);
 
-  // Filter change - show full loader
+  // Filter change - only show inline filter loader, not full screen
   useEffect(() => {
     setCurrentPage(0);
     setHasMore(true);
     setPaymentHistory([]);
-    setLoading(true);
     loadPaymentHistory(statusFilter, true, false);
   }, [statusFilter]);
 
@@ -127,7 +126,7 @@ export default function PaymentHistoryScreen({ navigation }) {
   };
 
   const loadMorePayments = async () => {
-    if (loadingMore || !hasMore) return;
+    if (loadingMore || !hasMore || filterLoading) return;
 
     setLoadingMore(true);
     await loadPaymentHistory(statusFilter, false);
@@ -696,14 +695,6 @@ export default function PaymentHistoryScreen({ navigation }) {
           </View>
         </View>
 
-        {/* Filter loading indicator */}
-        {filterLoading && (
-          <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingBottom: 8 }}>
-            <ActivityIndicator size="small" color="#6C63FF" />
-            <Text style={{ marginLeft: 8, fontSize: 13, color: '#6C63FF' }}>Filtering...</Text>
-          </View>
-        )}
-
         {/* Content */}
         {error && !refreshing ? (
           renderError()
@@ -716,12 +707,16 @@ export default function PaymentHistoryScreen({ navigation }) {
               item.transaction_id?.toString() ||
               index.toString()
             }
-            ListEmptyComponent={renderEmptyState}
+            ListEmptyComponent={filterLoading ? null : renderEmptyState}
             ListFooterComponent={() =>
-              loadingMore ? (
+              loadingMore && paymentHistory.length > 0 && !filterLoading ? (
                 <View style={styles.loadingMoreContainer}>
-                <ActivityIndicator size="small" color={colors.primary} />
+                  <ActivityIndicator size="small" color={colors.primary} />
                   <Text style={styles.loadingMoreText}>Loading more...</Text>
+                </View>
+              ) : filterLoading && !refreshing ? (
+                <View style={styles.loadingMoreContainer}>
+                  <ActivityIndicator size="small" color="#6C63FF" />
                 </View>
               ) : null
             }
