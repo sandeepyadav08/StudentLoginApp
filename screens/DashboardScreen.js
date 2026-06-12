@@ -9,6 +9,7 @@ import {
   Dimensions,
   Platform,
 } from "react-native";
+import { BlurView } from "expo-blur";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -117,23 +118,40 @@ export default function DashboardScreen({ navigation }) {
   };
 
   const StatCard = ({ title, count, color, icon }) => {
-    const bgColor = isDark ? `${color.icon}15` : color.bg;
+    const pad = getResponsivePadding(16, screenWidth);
+
+    if (Platform.OS === "ios") {
+      return (
+        <BlurView
+          intensity={55}
+          tint={isDark ? "dark" : "light"}
+          style={[styles.statCardWrapper, { padding: pad, borderColor: 'rgba(255,255,255,0.75)', borderWidth: 1.5 }]}
+        >
+          <View style={[styles.statCardOverlay, { backgroundColor: isDark ? `${color.icon}25` : `${color.bg}BB` }]} />
+          <View style={[styles.statIconWrapper, { backgroundColor: `${color.icon}30` }]}>
+            <Ionicons name={icon} size={screenWidth < 350 ? 20 : 24} color={color.icon} />
+          </View>
+          <Text style={[styles.statCount, { color: colors.text, fontSize: getResponsiveSize(28, screenWidth) }]}>{count}</Text>
+          <Text style={[styles.statTitle, { color: colors.textSecondary, fontSize: getResponsiveSize(12, screenWidth) }]}>{title}</Text>
+        </BlurView>
+      );
+    }
+
     return (
       <View
         style={[
-          styles.statCard,
-          { backgroundColor: bgColor, padding: getResponsivePadding(16, screenWidth) },
+          styles.statCardWrapper,
+          {
+            padding: pad,
+            backgroundColor: isDark ? `${color.icon}22` : color.bg,
+          },
         ]}
       >
-        <View style={styles.statIcon}>
+        <View style={[styles.statIconWrapper, { backgroundColor: `${color.icon}25` }]}>
           <Ionicons name={icon} size={screenWidth < 350 ? 20 : 24} color={color.icon} />
         </View>
-        <Text style={[styles.statCount, { color: colors.text, fontSize: getResponsiveSize(28, screenWidth) }]}>
-          {count}
-        </Text>
-        <Text style={[styles.statTitle, { color: colors.textSecondary, fontSize: getResponsiveSize(12, screenWidth) }]}>
-          {title}
-        </Text>
+        <Text style={[styles.statCount, { color: colors.text, fontSize: getResponsiveSize(28, screenWidth) }]}>{count}</Text>
+        <Text style={[styles.statTitle, { color: colors.textSecondary, fontSize: getResponsiveSize(12, screenWidth) }]}>{title}</Text>
       </View>
     );
   };
@@ -507,9 +525,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 12,
   },
-  statCard: {
+  statCardWrapper: {
     width: "31%",
-    padding: 16,
     borderRadius: 20,
     alignItems: "center",
     shadowColor: '#4C1D95',
@@ -517,8 +534,20 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.10,
     shadowRadius: 10,
     elevation: 4,
+    overflow: 'hidden',
+  },
+  statCardOverlay: {
+    ...StyleSheet.absoluteFillObject,
   },
   statIcon: {
+    marginBottom: 8,
+  },
+  statIconWrapper: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
     marginBottom: 8,
   },
   statCount: {
