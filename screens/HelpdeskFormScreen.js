@@ -456,8 +456,8 @@ const HelpdeskFormScreen = ({ navigation }) => {
                 setMainCategory("");
                 setSubCategory("");
                 setAvailableDate(new Date());
-                setAvailableTimeFrom(formatTime24Hr(new Date()));
-                setAvailableTimeTo(formatTime24Hr(new Date()));
+                setAvailableTimeFrom(new Date());
+                setAvailableTimeTo(new Date());
                 setNotes("");
                 setSelectedFile(null);
                 setOriginalFileName(null);

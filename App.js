@@ -8,6 +8,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar, Platform } from "react-native";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
+import ErrorBoundary from "./components/ErrorBoundary";
 import LoginScreen from "./screens/LoginScreen";
 import ForgotPasswordScreen from "./screens/ForgotPasswordScreen";
 import OtpVerificationScreen from "./screens/OtpVerificationScreen";
@@ -175,9 +176,11 @@ function AppNavigator() {
 export default function App() {
   return (
     <SafeAreaProvider style={{ backgroundColor: "#1a1a1a" }}>
-      <ThemeProvider>
-        <AppNavigator />
-      </ThemeProvider>
+      <ErrorBoundary>
+        <ThemeProvider>
+          <AppNavigator />
+        </ThemeProvider>
+      </ErrorBoundary>
     </SafeAreaProvider>
   );
 }
