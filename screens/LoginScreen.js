@@ -22,13 +22,15 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { loginAPI } from '../services/api';
 import FloatingInput from '../components/FloatingInput';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 const isIOS = Platform.OS === 'ios';
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function LoginScreen({ navigation }) {
+  const { colors, isDark } = useTheme();
+
   const [email, setEmail]             = useState('');
   const [password, setPassword]       = useState('');
   const [showPass, setShowPass]       = useState(false);
@@ -37,7 +39,6 @@ export default function LoginScreen({ navigation }) {
   const [rememberMe, setRememberMe]   = useState(false);
   const [entered, setEntered]         = useState(false);
 
-  // Animations
   const logoScale   = useRef(new Animated.Value(0)).current;
   const logoOpacity = useRef(new Animated.Value(0)).current;
   const cardY       = useRef(new Animated.Value(60)).current;
@@ -59,7 +60,7 @@ export default function LoginScreen({ navigation }) {
     ]).start(() => setEntered(true));
   };
 
-const shakeCard = () => {
+  const shakeCard = () => {
     Animated.sequence([
       Animated.timing(shakeX, { toValue: 10,  duration: 55, useNativeDriver: true }),
       Animated.timing(shakeX, { toValue: -10, duration: 55, useNativeDriver: true }),
@@ -124,45 +125,42 @@ const shakeCard = () => {
     });
   };
 
-  // Android par logo ka purple elevation glow star jaisa dikhta hai — wahan shadow band
   const logoShadow = isIOS ? null : { elevation: 0 };
 
-  return (
-    <SafeAreaView style={s.safe}>
-      <StatusBar style="dark" />
+  const waveOpacity = isDark ? 0.35 : 1;
 
-      {/* ── Background SVG Waves ── */}
+  return (
+    <SafeAreaView style={[s.safe, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
+
+      {/* Background SVG Waves */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        {/* Top wave */}
         <Svg width={width} height={320} viewBox={`0 0 ${width} 320`} style={{ position: 'absolute', top: 0 }}>
           <Defs>
             <LinearGradient id="waveGrad1" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0%" stopColor="#6C63FF" stopOpacity="0.22" />
-              <Stop offset="100%" stopColor="#48CAE4" stopOpacity="0.12" />
+              <Stop offset="0%" stopColor={colors.primary} stopOpacity={isDark ? "0.30" : "0.22"} />
+              <Stop offset="100%" stopColor="#48CAE4" stopOpacity={isDark ? "0.18" : "0.12"} />
             </LinearGradient>
             <LinearGradient id="waveGrad2" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0%" stopColor="#6C63FF" stopOpacity="0.12" />
-              <Stop offset="100%" stopColor="#48CAE4" stopOpacity="0.06" />
+              <Stop offset="0%" stopColor={colors.primary} stopOpacity={isDark ? "0.18" : "0.12"} />
+              <Stop offset="100%" stopColor="#48CAE4" stopOpacity={isDark ? "0.10" : "0.06"} />
             </LinearGradient>
           </Defs>
-          {/* Wave layer 1 */}
           <Path
             d={`M0,0 L${width},0 L${width},180 Q${width * 0.75},240 ${width * 0.5},200 Q${width * 0.25},160 0,220 Z`}
             fill="url(#waveGrad1)"
           />
-          {/* Wave layer 2 */}
           <Path
             d={`M0,0 L${width},0 L${width},140 Q${width * 0.75},200 ${width * 0.5},165 Q${width * 0.25},130 0,180 Z`}
             fill="url(#waveGrad2)"
           />
         </Svg>
 
-        {/* Bottom wave */}
         <Svg width={width} height={200} viewBox={`0 0 ${width} 200`} style={{ position: 'absolute', bottom: 0 }}>
           <Defs>
             <LinearGradient id="waveGrad3" x1="0" y1="1" x2="1" y2="0">
-              <Stop offset="0%" stopColor="#48CAE4" stopOpacity="0.10" />
-              <Stop offset="100%" stopColor="#6C63FF" stopOpacity="0.06" />
+              <Stop offset="0%" stopColor="#48CAE4" stopOpacity={isDark ? "0.15" : "0.10"} />
+              <Stop offset="100%" stopColor={colors.primary} stopOpacity={isDark ? "0.10" : "0.06"} />
             </LinearGradient>
           </Defs>
           <Path
@@ -179,13 +177,13 @@ const shakeCard = () => {
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
-            {/* ── Brand / Logo ── */}
+            {/* Brand / Logo */}
             <Animated.View
               style={[s.brand, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}
               renderToHardwareTextureAndroid={!entered}
             >
-              <View style={s.logoRing}>
-                <Animated.View style={[s.logoCircle, logoShadow]}>
+              <View style={[s.logoRing, { backgroundColor: `${colors.primary}20` }]}>
+                <Animated.View style={[s.logoCircle, logoShadow, { backgroundColor: colors.surface }]}>
                   <Image
                     source={require('../assets/iimt_logo_icon.png')}
                     style={s.logoImage}
@@ -193,25 +191,25 @@ const shakeCard = () => {
                   />
                 </Animated.View>
               </View>
-              <Text style={s.appName}>IIMT Portal</Text>
-              <Text style={s.tagline}>Your academic journey starts here</Text>
+              <Text style={[s.appName, { color: colors.text }]}>IIMT Portal</Text>
+              <Text style={[s.tagline, { color: colors.textSecondary }]}>Your academic journey starts here</Text>
             </Animated.View>
 
-            {/* ── Card ── */}
+            {/* Card */}
             <Animated.View
               style={[s.card, {
+                backgroundColor: colors.surface,
+                shadowColor: colors.shadow,
                 opacity: cardOpacity,
                 transform: [{ translateY: cardY }, { translateX: shakeX }],
               }]}
               renderToHardwareTextureAndroid={!entered}
             >
-              {/* Card Header */}
               <View style={s.cardHeader}>
-                <Text style={s.cardTitle}>Welcome Back</Text>
-                <Text style={s.cardSub}>Sign in to continue</Text>
+                <Text style={[s.cardTitle, { color: colors.text }]}>Welcome Back</Text>
+                <Text style={[s.cardSub, { color: colors.textTertiary }]}>Sign in to continue</Text>
               </View>
 
-              {/* Inputs */}
               <View style={{ marginTop: 20 }}>
                 <FloatingInput
                   label="Email Address"
@@ -232,7 +230,7 @@ const shakeCard = () => {
                   editable={!loading}
                   rightIcon={
                     <TouchableOpacity onPress={() => setShowPass(v => !v)} disabled={loading} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Ionicons name={showPass ? 'eye-outline' : 'eye-off-outline'} size={20} color="#A0AEC0" />
+                      <Ionicons name={showPass ? 'eye-outline' : 'eye-off-outline'} size={20} color={colors.textTertiary} />
                     </TouchableOpacity>
                   }
                 />
@@ -241,20 +239,20 @@ const shakeCard = () => {
               {/* Remember + Forgot */}
               <View style={s.optRow}>
                 <TouchableOpacity style={s.remRow} onPress={toggleRemember} activeOpacity={0.7}>
-                  <View style={[s.checkbox, rememberMe && s.checkOn]}>
+                  <View style={[s.checkbox, { borderColor: colors.border }, rememberMe && { backgroundColor: colors.primary, borderColor: colors.primary }]}>
                     {rememberMe && <Ionicons name="checkmark" size={12} color="#FFF" />}
                   </View>
-                  <Text style={s.remText}>Remember me</Text>
+                  <Text style={[s.remText, { color: colors.textSecondary }]}>Remember me</Text>
                 </TouchableOpacity>
                 <TouchableOpacity onPress={() => navigation.navigate('ForgotPassword')} activeOpacity={0.7}>
-                  <Text style={s.forgotText}>Forgot password?</Text>
+                  <Text style={[s.forgotText, { color: colors.primary }]}>Forgot password?</Text>
                 </TouchableOpacity>
               </View>
 
               {/* Sign In Button */}
               <Animated.View style={{ transform: [{ scale: btnScale }] }}>
                 <AnimatedTouchable
-                  style={[s.btn, loading && s.btnOff]}
+                  style={[s.btn, { backgroundColor: colors.primary }, loading && s.btnOff]}
                   onPress={handleLogin}
                   disabled={loading}
                   activeOpacity={0.9}
@@ -265,15 +263,13 @@ const shakeCard = () => {
                     <View style={s.btnInner}>
                       <Text style={s.btnText}>Sign In</Text>
                       <View style={s.btnArrow}>
-                        <Ionicons name="arrow-forward" size={16} color="#6C63FF" />
+                        <Ionicons name="arrow-forward" size={16} color={colors.primary} />
                       </View>
                     </View>
                   )}
                 </AnimatedTouchable>
               </Animated.View>
-
             </Animated.View>
-
           </ScrollView>
         </KeyboardAvoidingView>
       </TouchableWithoutFeedback>
@@ -281,12 +277,9 @@ const shakeCard = () => {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFFFFF' },
+  safe: { flex: 1 },
 
-
-  // Scroll
   scroll: {
     flexGrow: 1,
     justifyContent: 'flex-start',
@@ -296,13 +289,11 @@ const s = StyleSheet.create({
     minHeight: height - 80,
   },
 
-  // Brand
   brand: { alignItems: 'center', marginBottom: 28 },
   logoRing: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: 'rgba(108, 99, 255, 0.12)',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 14,
@@ -311,7 +302,6 @@ const s = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#6C63FF',
@@ -320,35 +310,27 @@ const s = StyleSheet.create({
     shadowRadius: 14,
     elevation: 10,
   },
-  logoImage: {
-    width: 60,
-    height: 60,
-  },
+  logoImage: { width: 60, height: 60 },
   appName: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#1A1A2E',
     letterSpacing: 0.4,
     marginBottom: 4,
   },
-  tagline: { fontSize: 13.5, color: '#718096', textAlign: 'center' },
+  tagline: { fontSize: 13.5, textAlign: 'center' },
 
-  // Card
   card: {
-    backgroundColor: '#FFFFFF',
     borderRadius: 26,
     padding: 26,
-    shadowColor: '#4C1D95',
     shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.13,
     shadowRadius: 28,
     elevation: 12,
   },
   cardHeader: { marginBottom: 4 },
-  cardTitle: { fontSize: 21, fontWeight: '700', color: '#1A1A2E', marginBottom: 3 },
-  cardSub: { fontSize: 14, color: '#A0AEC0', fontWeight: '400' },
+  cardTitle: { fontSize: 21, fontWeight: '700', marginBottom: 3 },
+  cardSub: { fontSize: 14, fontWeight: '400' },
 
-  // Options row
   optRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -362,18 +344,14 @@ const s = StyleSheet.create({
     height: 20,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: '#CBD5E0',
     marginRight: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  checkOn: { backgroundColor: '#6C63FF', borderColor: '#6C63FF' },
-  remText: { fontSize: 13, color: '#4A5568', fontWeight: '500' },
-  forgotText: { fontSize: 13, color: '#6C63FF', fontWeight: '600' },
+  remText: { fontSize: 13, fontWeight: '500' },
+  forgotText: { fontSize: 13, fontWeight: '600' },
 
-  // Button
   btn: {
-    backgroundColor: '#6C63FF',
     borderRadius: 14,
     height: 56,
     justifyContent: 'center',
@@ -396,5 +374,4 @@ const s = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-
 });

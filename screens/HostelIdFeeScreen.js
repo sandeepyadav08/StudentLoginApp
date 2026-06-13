@@ -461,7 +461,7 @@ export default function HostelIdFeeScreen({ navigation }) {
               <View
                 style={[
                   styles.dropdownMenu,
-                  { backgroundColor: colors.surface, borderColor: '#E8E6F0' },
+                  { backgroundColor: colors.surface, borderColor: colors.border },
                 ]}
               >
                 <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -472,7 +472,7 @@ export default function HostelIdFeeScreen({ navigation }) {
                         key={option.id}
                         style={[
                           styles.dropdownItem,
-                          isSelected && { backgroundColor: '#EEF0FF' },
+                          isSelected && { backgroundColor: colors.primaryContainer },
                         ]}
                         onPress={() => handleHostelPaymentSelect(hostel.id, option)}
                       >

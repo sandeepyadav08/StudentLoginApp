@@ -402,7 +402,7 @@ export default function CoursePlacementScreen({ navigation }) {
               style={[
                 styles.pickerButton,
                 {
-                  backgroundColor: '#F8F7FF',
+                  backgroundColor: colors.input,
                   borderColor: openDropdown === course.id ? '#6C63FF' : '#E8E6F0',
                 },
                 !isCourseSelected(course.id) && styles.pickerButtonDisabled,
@@ -444,7 +444,7 @@ export default function CoursePlacementScreen({ navigation }) {
               <View
                 style={[
                   styles.dropdownMenu,
-                  { backgroundColor: colors.surface, borderColor: '#E8E6F0' },
+                  { backgroundColor: colors.surface, borderColor: colors.border },
                 ]}
               >
                 <ScrollView
@@ -459,7 +459,7 @@ export default function CoursePlacementScreen({ navigation }) {
                         key={option.id}
                         style={[
                           styles.dropdownItem,
-                          isSelected && { backgroundColor: '#EEF0FF' },
+                          isSelected && { backgroundColor: colors.primaryContainer },
                         ]}
                         onPress={() => handleCoursePaymentSelect(course.id, option)}
                       >

@@ -11,12 +11,15 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { forgotPasswordAPI } from '../services/api';
 import FloatingInput from '../components/FloatingInput';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 const isIOS = Platform.OS === 'ios';
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 export default function ForgotPasswordScreen({ navigation }) {
+  const { colors, isDark } = useTheme();
+
   const [email, setEmail]     = useState('');
   const [loading, setLoading] = useState(false);
   const [errors, setErrors]   = useState({});
@@ -26,7 +29,7 @@ export default function ForgotPasswordScreen({ navigation }) {
   const iconOpacity = useRef(new Animated.Value(0)).current;
   const cardY       = useRef(new Animated.Value(50)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
-  const cardElev    = useRef(new Animated.Value(0)).current; // Android shadow fade (0 → 1)
+  const cardElev    = useRef(new Animated.Value(0)).current;
   const btnScale    = useRef(new Animated.Value(1)).current;
   const shakeX      = useRef(new Animated.Value(0)).current;
 
@@ -40,7 +43,6 @@ export default function ForgotPasswordScreen({ navigation }) {
         Animated.timing(cardElev,    { toValue: 1, duration: 550, delay: 100, useNativeDriver: false }),
       ]).start(() => setEntered(true));
     });
-
     return () => task.cancel();
   }, []);
 
@@ -83,27 +85,25 @@ export default function ForgotPasswordScreen({ navigation }) {
     });
   };
 
-  // Android: elevation shadow opacity ke saath fade nahi hota — isliye elevation ko hi card ke fade ke saath animate karo
   const cardShadow = isIOS ? null : { elevation: cardElev.interpolate({ inputRange: [0, 1], outputRange: [0, 12] }) };
   const btnShadow  = isIOS ? null : { elevation: cardElev.interpolate({ inputRange: [0, 1], outputRange: [0, 8] }) };
-  // Android par icon ka purple elevation glow star jaisa dikhta hai — wahan shadow band
   const iconShadow = isIOS ? null : { elevation: 0 };
 
   return (
-    <SafeAreaView style={s.safe}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[s.safe, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
 
       {/* Background SVG Waves */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <Svg width={width} height={320} viewBox={`0 0 ${width} 320`} style={{ position: 'absolute', top: 0 }}>
           <Defs>
             <LinearGradient id="waveGrad1" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0%" stopColor="#6C63FF" stopOpacity="0.22" />
-              <Stop offset="100%" stopColor="#48CAE4" stopOpacity="0.12" />
+              <Stop offset="0%" stopColor={colors.primary} stopOpacity={isDark ? "0.30" : "0.22"} />
+              <Stop offset="100%" stopColor="#48CAE4" stopOpacity={isDark ? "0.18" : "0.12"} />
             </LinearGradient>
             <LinearGradient id="waveGrad2" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0%" stopColor="#6C63FF" stopOpacity="0.12" />
-              <Stop offset="100%" stopColor="#48CAE4" stopOpacity="0.06" />
+              <Stop offset="0%" stopColor={colors.primary} stopOpacity={isDark ? "0.18" : "0.12"} />
+              <Stop offset="100%" stopColor="#48CAE4" stopOpacity={isDark ? "0.10" : "0.06"} />
             </LinearGradient>
           </Defs>
           <Path
@@ -118,8 +118,8 @@ export default function ForgotPasswordScreen({ navigation }) {
         <Svg width={width} height={200} viewBox={`0 0 ${width} 200`} style={{ position: 'absolute', bottom: 0 }}>
           <Defs>
             <LinearGradient id="waveGrad3" x1="0" y1="1" x2="1" y2="0">
-              <Stop offset="0%" stopColor="#48CAE4" stopOpacity="0.10" />
-              <Stop offset="100%" stopColor="#6C63FF" stopOpacity="0.06" />
+              <Stop offset="0%" stopColor="#48CAE4" stopOpacity={isDark ? "0.15" : "0.10"} />
+              <Stop offset="100%" stopColor={colors.primary} stopOpacity={isDark ? "0.10" : "0.06"} />
             </LinearGradient>
           </Defs>
           <Path
@@ -141,25 +141,27 @@ export default function ForgotPasswordScreen({ navigation }) {
               style={[s.iconSection, { opacity: iconOpacity, transform: [{ scale: iconScale }] }]}
               renderToHardwareTextureAndroid={!entered}
             >
-              <View style={s.iconRing}>
-                <Animated.View style={[s.iconCircle, iconShadow]}>
+              <View style={[s.iconRing, { backgroundColor: `${colors.primary}25` }]}>
+                <Animated.View style={[s.iconCircle, iconShadow, { backgroundColor: colors.primary }]}>
                   <Ionicons name="mail-unread-outline" size={34} color="#FFFFFF" />
                 </Animated.View>
               </View>
-              <Text style={s.screenTitle}>Forgot Password?</Text>
-              <Text style={s.screenSub}>No worries, we'll send you a reset code</Text>
+              <Text style={[s.screenTitle, { color: colors.text }]}>Forgot Password?</Text>
+              <Text style={[s.screenSub, { color: colors.textSecondary }]}>No worries, we'll send you a reset code</Text>
             </Animated.View>
 
             {/* Card */}
             <Animated.View
               style={[s.card, cardShadow, {
+                backgroundColor: colors.surface,
+                shadowColor: colors.shadow,
                 opacity: cardOpacity,
                 transform: [{ translateY: cardY }, { translateX: shakeX }],
               }]}
               renderToHardwareTextureAndroid={!entered}
             >
-              <Text style={s.cardTitle}>Enter your email</Text>
-              <Text style={s.cardSub}>We'll send a 6-digit OTP to verify your identity</Text>
+              <Text style={[s.cardTitle, { color: colors.text }]}>Enter your email</Text>
+              <Text style={[s.cardSub, { color: colors.textTertiary }]}>We'll send a 6-digit OTP to verify your identity</Text>
 
               <View style={{ marginTop: 22 }}>
                 <FloatingInput
@@ -176,7 +178,7 @@ export default function ForgotPasswordScreen({ navigation }) {
               {/* Send OTP Button */}
               <Animated.View style={{ transform: [{ scale: btnScale }], marginTop: 10 }}>
                 <AnimatedTouchable
-                  style={[s.btn, btnShadow, loading && s.btnOff]}
+                  style={[s.btn, btnShadow, { backgroundColor: colors.primary }, loading && s.btnOff]}
                   onPress={handleSend}
                   disabled={loading}
                   activeOpacity={0.9}
@@ -187,7 +189,7 @@ export default function ForgotPasswordScreen({ navigation }) {
                     <View style={s.btnInner}>
                       <Text style={s.btnText}>Send OTP</Text>
                       <View style={s.btnArrow}>
-                        <Ionicons name="send-outline" size={15} color="#6C63FF" />
+                        <Ionicons name="send-outline" size={15} color={colors.primary} />
                       </View>
                     </View>
                   )}
@@ -196,8 +198,8 @@ export default function ForgotPasswordScreen({ navigation }) {
 
               {/* Back to Login */}
               <TouchableOpacity style={s.loginRow} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-                <Ionicons name="arrow-back-outline" size={15} color="#6C63FF" />
-                <Text style={s.loginText}> Back to Sign In</Text>
+                <Ionicons name="arrow-back-outline" size={15} color={colors.primary} />
+                <Text style={[s.loginText, { color: colors.primary }]}> Back to Sign In</Text>
               </TouchableOpacity>
             </Animated.View>
           </ScrollView>
@@ -208,7 +210,7 @@ export default function ForgotPasswordScreen({ navigation }) {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFFFFF' },
+  safe: { flex: 1 },
 
   scroll: {
     flexGrow: 1,
@@ -222,28 +224,27 @@ const s = StyleSheet.create({
   iconSection: { alignItems: 'center', marginBottom: 28, marginTop: 20 },
   iconRing: {
     width: 92, height: 92, borderRadius: 46,
-    backgroundColor: 'rgba(108, 99, 255, 0.15)',
     justifyContent: 'center', alignItems: 'center', marginBottom: 14,
   },
   iconCircle: {
-    width: 72, height: 72, borderRadius: 36, backgroundColor: '#6C63FF',
+    width: 72, height: 72, borderRadius: 36,
     justifyContent: 'center', alignItems: 'center',
     shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4, shadowRadius: 16, elevation: 12,
   },
-  screenTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A2E', letterSpacing: 0.3, marginBottom: 4 },
-  screenSub: { fontSize: 13.5, color: '#718096', textAlign: 'center' },
+  screenTitle: { fontSize: 24, fontWeight: '800', letterSpacing: 0.3, marginBottom: 4 },
+  screenSub: { fontSize: 13.5, textAlign: 'center' },
 
   card: {
-    backgroundColor: '#FFFFFF', borderRadius: 26, padding: 26,
-    shadowColor: '#4C1D95', shadowOffset: { width: 0, height: 14 },
+    borderRadius: 26, padding: 26,
+    shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.13, shadowRadius: 28, elevation: 12,
   },
-  cardTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A2E', marginBottom: 4 },
-  cardSub: { fontSize: 13, color: '#A0AEC0' },
+  cardTitle: { fontSize: 18, fontWeight: '700', marginBottom: 4 },
+  cardSub: { fontSize: 13 },
 
   btn: {
-    backgroundColor: '#6C63FF', borderRadius: 14, height: 56,
+    borderRadius: 14, height: 56,
     justifyContent: 'center', alignItems: 'center',
     shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.38, shadowRadius: 14, elevation: 8, marginBottom: 20,
@@ -257,5 +258,5 @@ const s = StyleSheet.create({
   },
 
   loginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  loginText: { fontSize: 14, color: '#6C63FF', fontWeight: '600' },
+  loginText: { fontSize: 14, fontWeight: '600' },
 });

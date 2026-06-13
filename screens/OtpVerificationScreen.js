@@ -11,13 +11,14 @@ import { Ionicons } from '@expo/vector-icons';
 import Svg, { Path, Defs, LinearGradient, Stop } from 'react-native-svg';
 import { verifyOtpAPI, forgotPasswordAPI } from '../services/api';
 import FloatingInput from '../components/FloatingInput';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 const isIOS = Platform.OS === 'ios';
 const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
-// ─── Single OTP Box ───────────────────────────────────────────────────────────
-function OtpBox({ value, onChangeText, onKeyPress, inputRef, error, editable }) {
+// Single OTP Box
+function OtpBox({ value, onChangeText, onKeyPress, inputRef, error, editable, colors }) {
   const scale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -29,11 +30,18 @@ function OtpBox({ value, onChangeText, onKeyPress, inputRef, error, editable }) 
     }
   }, [value]);
 
+  const boxBg     = error ? (colors.isDark ? '#3B1E1E' : '#FFF5F5') : value ? colors.primaryContainer : colors.input;
+  const boxBorder = error ? '#EF4444' : value ? colors.primary : colors.inputBorder;
+
   return (
     <Animated.View style={{ transform: [{ scale }] }}>
       <TextInput
         ref={inputRef}
-        style={[ob.box, value && ob.filled, error && ob.errBox]}
+        style={[ob.box, {
+          borderColor: boxBorder,
+          backgroundColor: boxBg,
+          color: colors.text,
+        }]}
         value={value}
         onChangeText={onChangeText}
         onKeyPress={onKeyPress}
@@ -52,20 +60,15 @@ const ob = StyleSheet.create({
     width: (width - 44 - 22 * 2 - 5 * 10) / 6,
     height: 52,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
     borderRadius: 12,
-    backgroundColor: '#FAFAFA',
     fontSize: 20,
     fontWeight: '700',
-    color: '#1A202C',
     textAlign: 'center',
   },
-  filled: { borderColor: '#6C63FF', backgroundColor: '#F0EEFF' },
-  errBox: { borderColor: '#EF4444', backgroundColor: '#FFF5F5' },
 });
 
-// ─── Main Screen ──────────────────────────────────────────────────────────────
 export default function OtpVerificationScreen({ navigation, route }) {
+  const { colors, isDark } = useTheme();
   const { email } = route.params || {};
 
   const [otp, setOtp]                       = useState(['', '', '', '', '', '']);
@@ -81,11 +84,10 @@ export default function OtpVerificationScreen({ navigation, route }) {
 
   const otpRefs = [useRef(), useRef(), useRef(), useRef(), useRef(), useRef()];
 
-  // Animations
   const iconScale   = useRef(new Animated.Value(0)).current;
   const cardY       = useRef(new Animated.Value(50)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
-  const cardElev    = useRef(new Animated.Value(0)).current; // Android shadow fade (0 → 1)
+  const cardElev    = useRef(new Animated.Value(0)).current;
   const btnScale    = useRef(new Animated.Value(1)).current;
   const shakeX      = useRef(new Animated.Value(0)).current;
 
@@ -101,7 +103,6 @@ export default function OtpVerificationScreen({ navigation, route }) {
     return () => task.cancel();
   }, []);
 
-  // Countdown timer
   useEffect(() => {
     if (countdown > 0 && resendDisabled) {
       const t = setTimeout(() => setCountdown(c => c - 1), 1000);
@@ -181,27 +182,27 @@ export default function OtpVerificationScreen({ navigation, route }) {
     }
   };
 
-  // Android: elevation shadow opacity ke saath fade nahi hota — isliye elevation ko hi card ke fade ke saath animate karo
   const cardShadow = isIOS ? null : { elevation: cardElev.interpolate({ inputRange: [0, 1], outputRange: [0, 12] }) };
   const btnShadow  = isIOS ? null : { elevation: cardElev.interpolate({ inputRange: [0, 1], outputRange: [0, 8] }) };
-  // Android par icon ka purple elevation glow star jaisa dikhta hai — wahan shadow band
   const iconShadow = isIOS ? null : { elevation: 0 };
 
+  const colorsWithDark = { ...colors, isDark };
+
   return (
-    <SafeAreaView style={s.safe}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[s.safe, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
 
       {/* Background SVG Waves */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
         <Svg width={width} height={320} viewBox={`0 0 ${width} 320`} style={{ position: 'absolute', top: 0 }}>
           <Defs>
             <LinearGradient id="waveGrad1" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0%" stopColor="#6C63FF" stopOpacity="0.22" />
-              <Stop offset="100%" stopColor="#48CAE4" stopOpacity="0.12" />
+              <Stop offset="0%" stopColor={colors.primary} stopOpacity={isDark ? "0.30" : "0.22"} />
+              <Stop offset="100%" stopColor="#48CAE4" stopOpacity={isDark ? "0.18" : "0.12"} />
             </LinearGradient>
             <LinearGradient id="waveGrad2" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0%" stopColor="#6C63FF" stopOpacity="0.12" />
-              <Stop offset="100%" stopColor="#48CAE4" stopOpacity="0.06" />
+              <Stop offset="0%" stopColor={colors.primary} stopOpacity={isDark ? "0.18" : "0.12"} />
+              <Stop offset="100%" stopColor="#48CAE4" stopOpacity={isDark ? "0.10" : "0.06"} />
             </LinearGradient>
           </Defs>
           <Path
@@ -216,8 +217,8 @@ export default function OtpVerificationScreen({ navigation, route }) {
         <Svg width={width} height={200} viewBox={`0 0 ${width} 200`} style={{ position: 'absolute', bottom: 0 }}>
           <Defs>
             <LinearGradient id="waveGrad3" x1="0" y1="1" x2="1" y2="0">
-              <Stop offset="0%" stopColor="#48CAE4" stopOpacity="0.10" />
-              <Stop offset="100%" stopColor="#6C63FF" stopOpacity="0.06" />
+              <Stop offset="0%" stopColor="#48CAE4" stopOpacity={isDark ? "0.15" : "0.10"} />
+              <Stop offset="100%" stopColor={colors.primary} stopOpacity={isDark ? "0.10" : "0.06"} />
             </LinearGradient>
           </Defs>
           <Path
@@ -236,8 +237,8 @@ export default function OtpVerificationScreen({ navigation, route }) {
           >
             {/* Back Button */}
             <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-              <View style={s.backCircle}>
-                <Ionicons name="arrow-back" size={20} color="#6C63FF" />
+              <View style={[s.backCircle, { backgroundColor: colors.surface, shadowColor: colors.primary }]}>
+                <Ionicons name="arrow-back" size={20} color={colors.primary} />
               </View>
             </TouchableOpacity>
 
@@ -246,26 +247,28 @@ export default function OtpVerificationScreen({ navigation, route }) {
               style={[s.iconSection, { transform: [{ scale: iconScale }] }]}
               renderToHardwareTextureAndroid={!entered}
             >
-              <View style={s.iconRing}>
-                <Animated.View style={[s.iconCircle, iconShadow]}>
+              <View style={[s.iconRing, { backgroundColor: `${colors.primary}25` }]}>
+                <Animated.View style={[s.iconCircle, iconShadow, { backgroundColor: colors.primary }]}>
                   <Ionicons name="shield-checkmark-outline" size={34} color="#FFFFFF" />
                 </Animated.View>
               </View>
-              <Text style={s.screenTitle}>Verify OTP</Text>
-              <Text style={s.screenSub}>Code sent to</Text>
-              <Text style={s.emailHighlight}>{email}</Text>
+              <Text style={[s.screenTitle, { color: colors.text }]}>Verify OTP</Text>
+              <Text style={[s.screenSub, { color: colors.textSecondary }]}>Code sent to</Text>
+              <Text style={[s.emailHighlight, { color: colors.primary }]}>{email}</Text>
             </Animated.View>
 
             {/* Card */}
             <Animated.View
               style={[s.card, cardShadow, {
+                backgroundColor: colors.surface,
+                shadowColor: colors.shadow,
                 opacity: cardOpacity,
                 transform: [{ translateY: cardY }, { translateX: shakeX }],
               }]}
               renderToHardwareTextureAndroid={!entered}
             >
               {/* OTP Boxes */}
-              <Text style={s.sectionLabel}>Enter 6-digit OTP</Text>
+              <Text style={[s.sectionLabel, { color: colors.textSecondary }]}>Enter 6-digit OTP</Text>
               <View style={s.otpRow}>
                 {otp.map((digit, idx) => (
                   <OtpBox
@@ -276,6 +279,7 @@ export default function OtpVerificationScreen({ navigation, route }) {
                     onKeyPress={({ nativeEvent }) => handleKeyPress(nativeEvent.key, idx)}
                     error={!!errors.otp}
                     editable={!loading}
+                    colors={colorsWithDark}
                   />
                 ))}
               </View>
@@ -283,9 +287,9 @@ export default function OtpVerificationScreen({ navigation, route }) {
 
               {/* Resend */}
               <View style={s.resendRow}>
-                <Text style={s.resendInfo}>Didn't receive code? </Text>
+                <Text style={[s.resendInfo, { color: colors.textSecondary }]}>Didn't receive code? </Text>
                 <TouchableOpacity onPress={handleResend} disabled={resendDisabled} activeOpacity={0.7}>
-                  <Text style={[s.resendLink, resendDisabled && s.resendOff]}>
+                  <Text style={[s.resendLink, { color: colors.primary }, resendDisabled && { color: colors.textTertiary }]}>
                     {resendDisabled ? `Resend in ${countdown}s` : 'Resend OTP'}
                   </Text>
                 </TouchableOpacity>
@@ -293,9 +297,9 @@ export default function OtpVerificationScreen({ navigation, route }) {
 
               {/* Divider */}
               <View style={s.divRow}>
-                <View style={s.divLine} />
-                <Text style={s.divLabel}>NEW PASSWORD</Text>
-                <View style={s.divLine} />
+                <View style={[s.divLine, { backgroundColor: colors.border }]} />
+                <Text style={[s.divLabel, { color: colors.textTertiary }]}>NEW PASSWORD</Text>
+                <View style={[s.divLine, { backgroundColor: colors.border }]} />
               </View>
 
               {/* New Password */}
@@ -309,7 +313,7 @@ export default function OtpVerificationScreen({ navigation, route }) {
                 editable={!loading}
                 rightIcon={
                   <TouchableOpacity onPress={() => setShowNew(v => !v)} disabled={loading} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name={showNew ? 'eye-outline' : 'eye-off-outline'} size={20} color="#A0AEC0" />
+                    <Ionicons name={showNew ? 'eye-outline' : 'eye-off-outline'} size={20} color={colors.textTertiary} />
                   </TouchableOpacity>
                 }
               />
@@ -325,7 +329,7 @@ export default function OtpVerificationScreen({ navigation, route }) {
                 editable={!loading}
                 rightIcon={
                   <TouchableOpacity onPress={() => setShowConfirm(v => !v)} disabled={loading} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                    <Ionicons name={showConfirm ? 'eye-outline' : 'eye-off-outline'} size={20} color="#A0AEC0" />
+                    <Ionicons name={showConfirm ? 'eye-outline' : 'eye-off-outline'} size={20} color={colors.textTertiary} />
                   </TouchableOpacity>
                 }
               />
@@ -333,7 +337,7 @@ export default function OtpVerificationScreen({ navigation, route }) {
               {/* Reset Button */}
               <Animated.View style={{ transform: [{ scale: btnScale }], marginTop: 8 }}>
                 <AnimatedTouchable
-                  style={[s.btn, btnShadow, loading && s.btnOff]}
+                  style={[s.btn, btnShadow, { backgroundColor: colors.primary }, loading && s.btnOff]}
                   onPress={handleVerify}
                   disabled={loading}
                   activeOpacity={0.9}
@@ -344,7 +348,7 @@ export default function OtpVerificationScreen({ navigation, route }) {
                     <View style={s.btnInner}>
                       <Text style={s.btnText}>Reset Password</Text>
                       <View style={s.btnArrow}>
-                        <Ionicons name="checkmark" size={16} color="#6C63FF" />
+                        <Ionicons name="checkmark" size={16} color={colors.primary} />
                       </View>
                     </View>
                   )}
@@ -353,8 +357,8 @@ export default function OtpVerificationScreen({ navigation, route }) {
 
               {/* Back to Login */}
               <TouchableOpacity style={s.loginRow} onPress={() => navigation.navigate('Login')} activeOpacity={0.7}>
-                <Ionicons name="arrow-back-outline" size={15} color="#6C63FF" />
-                <Text style={s.loginText}> Back to Sign In</Text>
+                <Ionicons name="arrow-back-outline" size={15} color={colors.primary} />
+                <Text style={[s.loginText, { color: colors.primary }]}> Back to Sign In</Text>
               </TouchableOpacity>
             </Animated.View>
           </ScrollView>
@@ -365,7 +369,7 @@ export default function OtpVerificationScreen({ navigation, route }) {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#FFFFFF' },
+  safe: { flex: 1 },
 
   scroll: {
     flexGrow: 1, paddingHorizontal: 22, paddingVertical: 28, minHeight: height - 80,
@@ -373,51 +377,49 @@ const s = StyleSheet.create({
 
   backBtn: { marginBottom: 8 },
   backCircle: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF',
+    width: 40, height: 40, borderRadius: 20,
     justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15, shadowRadius: 6, elevation: 4,
   },
 
   iconSection: { alignItems: 'center', marginBottom: 24, marginTop: 8 },
   iconRing: {
     width: 92, height: 92, borderRadius: 46,
-    backgroundColor: 'rgba(108, 99, 255, 0.15)',
     justifyContent: 'center', alignItems: 'center', marginBottom: 12,
   },
   iconCircle: {
-    width: 72, height: 72, borderRadius: 36, backgroundColor: '#6C63FF',
+    width: 72, height: 72, borderRadius: 36,
     justifyContent: 'center', alignItems: 'center',
     shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4, shadowRadius: 16, elevation: 12,
   },
-  screenTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A2E', marginBottom: 4 },
-  screenSub: { fontSize: 13.5, color: '#718096' },
-  emailHighlight: { fontSize: 14, fontWeight: '700', color: '#6C63FF', marginTop: 2 },
+  screenTitle: { fontSize: 24, fontWeight: '800', marginBottom: 4 },
+  screenSub: { fontSize: 13.5 },
+  emailHighlight: { fontSize: 14, fontWeight: '700', marginTop: 2 },
 
   card: {
-    backgroundColor: '#FFFFFF', borderRadius: 26, padding: 24,
-    shadowColor: '#4C1D95', shadowOffset: { width: 0, height: 14 },
+    borderRadius: 26, padding: 24,
+    shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.13, shadowRadius: 28, elevation: 12,
   },
 
-  sectionLabel: { fontSize: 14, fontWeight: '600', color: '#4A5568', marginBottom: 14 },
+  sectionLabel: { fontSize: 14, fontWeight: '600', marginBottom: 14 },
 
   otpRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
 
   errText: { fontSize: 12, color: '#EF4444', textAlign: 'center', marginBottom: 10 },
 
   resendRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 20, marginTop: 4 },
-  resendInfo: { fontSize: 13, color: '#718096' },
-  resendLink: { fontSize: 13, color: '#6C63FF', fontWeight: '700' },
-  resendOff: { color: '#A0AEC0' },
+  resendInfo: { fontSize: 13 },
+  resendLink: { fontSize: 13, fontWeight: '700' },
 
   divRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 18 },
-  divLine: { flex: 1, height: 1, backgroundColor: '#EDF2F7' },
-  divLabel: { fontSize: 10, color: '#CBD5E0', marginHorizontal: 10, letterSpacing: 1.2, fontWeight: '600' },
+  divLine: { flex: 1, height: 1 },
+  divLabel: { fontSize: 10, marginHorizontal: 10, letterSpacing: 1.2, fontWeight: '600' },
 
   btn: {
-    backgroundColor: '#6C63FF', borderRadius: 14, height: 56,
+    borderRadius: 14, height: 56,
     justifyContent: 'center', alignItems: 'center',
     shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.38, shadowRadius: 14, elevation: 8, marginBottom: 18,
@@ -431,5 +433,5 @@ const s = StyleSheet.create({
   },
 
   loginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  loginText: { fontSize: 14, color: '#6C63FF', fontWeight: '600' },
+  loginText: { fontSize: 14, fontWeight: '600' },
 });

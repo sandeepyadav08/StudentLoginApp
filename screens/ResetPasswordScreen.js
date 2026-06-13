@@ -9,6 +9,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import FloatingInput from '../components/FloatingInput';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { width, height } = Dimensions.get('window');
 const isIOS = Platform.OS === 'ios';
@@ -25,6 +26,7 @@ const getStrength = (pw) => {
 };
 
 export default function ResetPasswordScreen({ navigation, route }) {
+  const { colors, isDark } = useTheme();
   const { email, otpToken, otpVerified } = route.params || {};
 
   const [newPassword, setNewPassword]         = useState('');
@@ -38,7 +40,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
   const iconScale   = useRef(new Animated.Value(0)).current;
   const cardY       = useRef(new Animated.Value(50)).current;
   const cardOpacity = useRef(new Animated.Value(0)).current;
-  const cardElev    = useRef(new Animated.Value(0)).current; // Android shadow fade (0 → 1)
+  const cardElev    = useRef(new Animated.Value(0)).current;
   const btnScale    = useRef(new Animated.Value(1)).current;
   const shakeX      = useRef(new Animated.Value(0)).current;
   const orb1Y       = useRef(new Animated.Value(0)).current;
@@ -73,7 +75,6 @@ export default function ResetPasswordScreen({ navigation, route }) {
     return () => task.cancel();
   }, []);
 
-  // Animate strength bar
   useEffect(() => {
     const str = getStrength(newPassword);
     const target = parseFloat(str.pct) / 100;
@@ -134,21 +135,23 @@ export default function ResetPasswordScreen({ navigation, route }) {
   const orb2T     = orb2Y.interpolate({ inputRange: [0, 1], outputRange: [0, -18] });
   const barWidth  = strengthW.interpolate({ inputRange: [0, 1], outputRange: ['0%', '100%'] });
 
-  // Android: elevation shadow opacity ke saath fade nahi hota — isliye elevation ko hi card ke fade ke saath animate karo
   const cardShadow = isIOS ? null : { elevation: cardElev.interpolate({ inputRange: [0, 1], outputRange: [0, 12] }) };
   const btnShadow  = isIOS ? null : { elevation: cardElev.interpolate({ inputRange: [0, 1], outputRange: [0, 8] }) };
-  // Android par icon ka purple elevation glow star jaisa dikhta hai — wahan shadow band
   const iconShadow = isIOS ? null : { elevation: 0 };
 
+  const orbColor1 = isDark ? 'rgba(139, 131, 255, 0.18)' : 'rgba(108, 99, 255, 0.13)';
+  const orbColor2 = isDark ? 'rgba(59, 130, 246, 0.14)'  : 'rgba(59, 130, 246, 0.1)';
+  const orbColor3 = isDark ? 'rgba(236, 72, 153, 0.10)'  : 'rgba(236, 72, 153, 0.07)';
+
   return (
-    <SafeAreaView style={s.safe}>
-      <StatusBar style="dark" />
+    <SafeAreaView style={[s.safe, { backgroundColor: colors.background }]}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
 
       {/* Background Orbs */}
       <View style={StyleSheet.absoluteFill} pointerEvents="none">
-        <Animated.View style={[s.orb1, { transform: [{ translateY: orb1T }] }]} />
-        <Animated.View style={[s.orb2, { transform: [{ translateY: orb2T }] }]} />
-        <View style={s.orb3} />
+        <Animated.View style={[s.orb1, { backgroundColor: orbColor1, transform: [{ translateY: orb1T }] }]} />
+        <Animated.View style={[s.orb2, { backgroundColor: orbColor2, transform: [{ translateY: orb2T }] }]} />
+        <View style={[s.orb3, { backgroundColor: orbColor3 }]} />
       </View>
 
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -160,8 +163,8 @@ export default function ResetPasswordScreen({ navigation, route }) {
           >
             {/* Back Button */}
             <TouchableOpacity style={s.backBtn} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-              <View style={s.backCircle}>
-                <Ionicons name="arrow-back" size={20} color="#6C63FF" />
+              <View style={[s.backCircle, { backgroundColor: colors.surface, shadowColor: colors.primary }]}>
+                <Ionicons name="arrow-back" size={20} color={colors.primary} />
               </View>
             </TouchableOpacity>
 
@@ -170,29 +173,30 @@ export default function ResetPasswordScreen({ navigation, route }) {
               style={[s.iconSection, { transform: [{ scale: iconScale }] }]}
               renderToHardwareTextureAndroid={!entered}
             >
-              <View style={s.iconRing}>
-                <Animated.View style={[s.iconCircle, iconShadow]}>
+              <View style={[s.iconRing, { backgroundColor: `${colors.primary}25` }]}>
+                <Animated.View style={[s.iconCircle, iconShadow, { backgroundColor: colors.primary }]}>
                   <Ionicons name="key-outline" size={34} color="#FFFFFF" />
                 </Animated.View>
               </View>
-              <Text style={s.screenTitle}>Reset Password</Text>
-              <Text style={s.screenSub}>Create a strong new password for</Text>
-              <Text style={s.emailHighlight}>{email}</Text>
+              <Text style={[s.screenTitle, { color: colors.text }]}>Reset Password</Text>
+              <Text style={[s.screenSub, { color: colors.textSecondary }]}>Create a strong new password for</Text>
+              <Text style={[s.emailHighlight, { color: colors.primary }]}>{email}</Text>
             </Animated.View>
 
             {/* Card */}
             <Animated.View
               style={[s.card, cardShadow, {
+                backgroundColor: colors.surface,
+                shadowColor: colors.shadow,
                 opacity: cardOpacity,
                 transform: [{ translateY: cardY }, { translateX: shakeX }],
               }]}
               renderToHardwareTextureAndroid={!entered}
             >
-              <Text style={s.cardTitle}>New Password</Text>
-              <Text style={s.cardSub}>Must be at least 8 characters</Text>
+              <Text style={[s.cardTitle, { color: colors.text }]}>New Password</Text>
+              <Text style={[s.cardSub, { color: colors.textTertiary }]}>Must be at least 8 characters</Text>
 
               <View style={{ marginTop: 20 }}>
-                {/* New Password */}
                 <FloatingInput
                   label="New Password"
                   icon="lock-closed-outline"
@@ -203,7 +207,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
                   editable={!loading}
                   rightIcon={
                     <TouchableOpacity onPress={() => setShowNew(v => !v)} disabled={loading} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                      <Ionicons name={showNew ? 'eye-outline' : 'eye-off-outline'} size={20} color="#A0AEC0" />
+                      <Ionicons name={showNew ? 'eye-outline' : 'eye-off-outline'} size={20} color={colors.textTertiary} />
                     </TouchableOpacity>
                   }
                 />
@@ -211,14 +215,13 @@ export default function ResetPasswordScreen({ navigation, route }) {
                 {/* Strength Bar */}
                 {newPassword.length > 0 && (
                   <View style={s.strengthWrap}>
-                    <View style={s.strengthTrack}>
+                    <View style={[s.strengthTrack, { backgroundColor: colors.borderLight }]}>
                       <Animated.View style={[s.strengthFill, { width: barWidth, backgroundColor: strength.color }]} />
                     </View>
                     <Text style={[s.strengthLabel, { color: strength.color }]}>{strength.label}</Text>
                   </View>
                 )}
 
-                {/* Confirm Password */}
                 <View style={{ marginTop: 6 }}>
                   <FloatingInput
                     label="Confirm Password"
@@ -230,7 +233,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
                     editable={!loading}
                     rightIcon={
                       <TouchableOpacity onPress={() => setShowConfirm(v => !v)} disabled={loading} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-                        <Ionicons name={showConfirm ? 'eye-outline' : 'eye-off-outline'} size={20} color="#A0AEC0" />
+                        <Ionicons name={showConfirm ? 'eye-outline' : 'eye-off-outline'} size={20} color={colors.textTertiary} />
                       </TouchableOpacity>
                     }
                   />
@@ -238,15 +241,15 @@ export default function ResetPasswordScreen({ navigation, route }) {
               </View>
 
               {/* Password Rules */}
-              <View style={s.rulesBox}>
+              <View style={[s.rulesBox, { backgroundColor: colors.surfaceVariant }]}>
                 {[
                   ['At least 8 characters',              newPassword.length >= 8],
                   ['Uppercase & lowercase letters',       /[A-Z]/.test(newPassword) && /[a-z]/.test(newPassword)],
                   ['At least one number',                 /\d/.test(newPassword)],
                 ].map(([rule, met]) => (
                   <View key={rule} style={s.ruleRow}>
-                    <Ionicons name={met ? 'checkmark-circle' : 'ellipse-outline'} size={14} color={met ? '#10B981' : '#CBD5E0'} />
-                    <Text style={[s.ruleText, met && s.ruleTextMet]}>{rule}</Text>
+                    <Ionicons name={met ? 'checkmark-circle' : 'ellipse-outline'} size={14} color={met ? '#10B981' : colors.textTertiary} />
+                    <Text style={[s.ruleText, { color: colors.textTertiary }, met && { color: colors.text }]}>{rule}</Text>
                   </View>
                 ))}
               </View>
@@ -254,7 +257,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
               {/* Reset Button */}
               <Animated.View style={{ transform: [{ scale: btnScale }] }}>
                 <AnimatedTouchable
-                  style={[s.btn, btnShadow, loading && s.btnOff]}
+                  style={[s.btn, btnShadow, { backgroundColor: colors.primary }, loading && s.btnOff]}
                   onPress={handleReset}
                   disabled={loading}
                   activeOpacity={0.9}
@@ -265,7 +268,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
                     <View style={s.btnInner}>
                       <Text style={s.btnText}>Reset Password</Text>
                       <View style={s.btnArrow}>
-                        <Ionicons name="checkmark" size={16} color="#6C63FF" />
+                        <Ionicons name="checkmark" size={16} color={colors.primary} />
                       </View>
                     </View>
                   )}
@@ -274,8 +277,8 @@ export default function ResetPasswordScreen({ navigation, route }) {
 
               {/* Back to Login */}
               <TouchableOpacity style={s.loginRow} onPress={() => navigation.navigate('Login')} activeOpacity={0.7}>
-                <Ionicons name="arrow-back-outline" size={15} color="#6C63FF" />
-                <Text style={s.loginText}> Back to Sign In</Text>
+                <Ionicons name="arrow-back-outline" size={15} color={colors.primary} />
+                <Text style={[s.loginText, { color: colors.primary }]}> Back to Sign In</Text>
               </TouchableOpacity>
             </Animated.View>
           </ScrollView>
@@ -286,21 +289,21 @@ export default function ResetPasswordScreen({ navigation, route }) {
 }
 
 const s = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: '#F0EEFF' },
+  safe: { flex: 1 },
 
   orb1: {
     position: 'absolute', width: width * 0.75, height: width * 0.75,
-    borderRadius: width * 0.375, backgroundColor: 'rgba(108, 99, 255, 0.13)',
+    borderRadius: width * 0.375,
     top: -width * 0.22, left: -width * 0.18,
   },
   orb2: {
     position: 'absolute', width: width * 0.55, height: width * 0.55,
-    borderRadius: width * 0.275, backgroundColor: 'rgba(59, 130, 246, 0.1)',
+    borderRadius: width * 0.275,
     bottom: height * 0.08, right: -width * 0.12,
   },
   orb3: {
     position: 'absolute', width: width * 0.32, height: width * 0.32,
-    borderRadius: width * 0.16, backgroundColor: 'rgba(236, 72, 153, 0.07)',
+    borderRadius: width * 0.16,
     top: height * 0.38, right: -width * 0.06,
   },
 
@@ -310,53 +313,49 @@ const s = StyleSheet.create({
 
   backBtn: { marginBottom: 8 },
   backCircle: {
-    width: 40, height: 40, borderRadius: 20, backgroundColor: '#FFFFFF',
+    width: 40, height: 40, borderRadius: 20,
     justifyContent: 'center', alignItems: 'center',
-    shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15, shadowRadius: 6, elevation: 4,
   },
 
   iconSection: { alignItems: 'center', marginBottom: 24, marginTop: 8 },
   iconRing: {
     width: 92, height: 92, borderRadius: 46,
-    backgroundColor: 'rgba(108, 99, 255, 0.15)',
     justifyContent: 'center', alignItems: 'center', marginBottom: 12,
   },
   iconCircle: {
-    width: 72, height: 72, borderRadius: 36, backgroundColor: '#6C63FF',
+    width: 72, height: 72, borderRadius: 36,
     justifyContent: 'center', alignItems: 'center',
     shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.4, shadowRadius: 16, elevation: 12,
   },
-  screenTitle: { fontSize: 24, fontWeight: '800', color: '#1A1A2E', marginBottom: 4 },
-  screenSub: { fontSize: 13.5, color: '#718096' },
-  emailHighlight: { fontSize: 14, fontWeight: '700', color: '#6C63FF', marginTop: 2 },
+  screenTitle: { fontSize: 24, fontWeight: '800', marginBottom: 4 },
+  screenSub: { fontSize: 13.5 },
+  emailHighlight: { fontSize: 14, fontWeight: '700', marginTop: 2 },
 
   card: {
-    backgroundColor: '#FFFFFF', borderRadius: 26, padding: 24,
-    shadowColor: '#4C1D95', shadowOffset: { width: 0, height: 14 },
+    borderRadius: 26, padding: 24,
+    shadowOffset: { width: 0, height: 14 },
     shadowOpacity: 0.13, shadowRadius: 28, elevation: 12,
   },
-  cardTitle: { fontSize: 18, fontWeight: '700', color: '#1A1A2E', marginBottom: 3 },
-  cardSub: { fontSize: 13, color: '#A0AEC0' },
+  cardTitle: { fontSize: 18, fontWeight: '700', marginBottom: 3 },
+  cardSub: { fontSize: 13 },
 
-  // Strength
   strengthWrap: { flexDirection: 'row', alignItems: 'center', marginBottom: 12, marginTop: 6, gap: 10 },
-  strengthTrack: { flex: 1, height: 5, backgroundColor: '#EDF2F7', borderRadius: 3, overflow: 'hidden' },
+  strengthTrack: { flex: 1, height: 5, borderRadius: 3, overflow: 'hidden' },
   strengthFill: { height: '100%', borderRadius: 3 },
   strengthLabel: { fontSize: 12, fontWeight: '700', minWidth: 46 },
 
-  // Rules
   rulesBox: {
-    backgroundColor: '#F8F8FF', borderRadius: 12, padding: 14,
+    borderRadius: 12, padding: 14,
     marginBottom: 20, marginTop: 4, gap: 8,
   },
   ruleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  ruleText: { fontSize: 13, color: '#A0AEC0', fontWeight: '500' },
-  ruleTextMet: { color: '#2D3748' },
+  ruleText: { fontSize: 13, fontWeight: '500' },
 
   btn: {
-    backgroundColor: '#6C63FF', borderRadius: 14, height: 56,
+    borderRadius: 14, height: 56,
     justifyContent: 'center', alignItems: 'center',
     shadowColor: '#6C63FF', shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.38, shadowRadius: 14, elevation: 8, marginBottom: 18,
@@ -370,5 +369,5 @@ const s = StyleSheet.create({
   },
 
   loginRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
-  loginText: { fontSize: 14, color: '#6C63FF', fontWeight: '600' },
+  loginText: { fontSize: 14, fontWeight: '600' },
 });

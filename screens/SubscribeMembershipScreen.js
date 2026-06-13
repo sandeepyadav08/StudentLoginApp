@@ -838,7 +838,7 @@ export default function SubscribeMembershipScreen({ navigation }) {
                         <View
                           style={[
                             styles.dropdownMenu,
-                            { backgroundColor: colors.surface, borderColor: '#E8E6F0' },
+                            { backgroundColor: colors.surface, borderColor: colors.border },
                           ]}
                         >
                           <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
@@ -849,7 +849,7 @@ export default function SubscribeMembershipScreen({ navigation }) {
                                   key={option.id}
                                   style={[
                                     styles.dropdownItem,
-                                    isSelected && { backgroundColor: '#EEF0FF' },
+                                    isSelected && { backgroundColor: colors.primaryContainer },
                                   ]}
                                   onPress={() => {
                                     handleUtilityPaymentSelect(utility.id, option);
@@ -1279,19 +1279,19 @@ export default function SubscribeMembershipScreen({ navigation }) {
       {Platform.OS === 'ios' ? (
         <Modal visible={!!showDatePicker.utilityId} transparent animationType="slide">
           <View style={styles.dateModalOverlay}>
-            <View style={styles.dateModalContainer}>
-              <View style={styles.dateModalHeader}>
+            <View style={[styles.dateModalContainer, { backgroundColor: colors.surface }]}>
+              <View style={[styles.dateModalHeader, { borderBottomColor: colors.border }]}>
                 <TouchableOpacity onPress={() => setShowDatePicker({ utilityId: null, type: null })}>
-                  <Text style={styles.dateModalCancel}>Cancel</Text>
+                  <Text style={[styles.dateModalCancel, { color: colors.textTertiary }]}>Cancel</Text>
                 </TouchableOpacity>
-                <Text style={styles.dateModalTitle}>Select Date</Text>
+                <Text style={[styles.dateModalTitle, { color: colors.text }]}>Select Date</Text>
                 <TouchableOpacity onPress={() => {
                   if (showDatePicker.type === "start") {
                     handleUtilityStartDateChange(showDatePicker.utilityId, tempPickerDate);
                   }
                   setShowDatePicker({ utilityId: null, type: null });
                 }}>
-                  <Text style={styles.dateModalDone}>Done</Text>
+                  <Text style={[styles.dateModalDone, { color: colors.primary }]}>Done</Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
@@ -1302,7 +1302,8 @@ export default function SubscribeMembershipScreen({ navigation }) {
                   if (selectedDate) setTempPickerDate(selectedDate);
                 }}
                 minimumDate={new Date()}
-                accentColor="#6C63FF"
+                accentColor={colors.primary}
+                themeVariant={isDark ? "dark" : "light"}
                 style={{ width: '100%' }}
               />
             </View>

@@ -256,7 +256,7 @@ export default function DashboardScreen({ navigation }) {
           ]}
         >
           <TouchableOpacity
-            style={styles.menuButton}
+            style={[styles.menuButton, { backgroundColor: colors.primaryContainer }]}
             onPress={toggleDrawer}
             activeOpacity={0.7}
           >
@@ -273,7 +273,7 @@ export default function DashboardScreen({ navigation }) {
           >
             Student Portal
           </Text>
-          <TouchableOpacity style={styles.notificationButton}>
+          <TouchableOpacity style={[styles.notificationButton, { backgroundColor: colors.primaryContainer }]}>
             <Ionicons name="notifications-outline" size={24} color={colors.primary} />
           </TouchableOpacity>
         </View>
@@ -479,7 +479,7 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#EEF0FF',
+    backgroundColor: 'transparent',
     padding: 0,
   },
   headerTitle: {
@@ -493,7 +493,7 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#EEF0FF',
+    backgroundColor: 'transparent',
     padding: 0,
   },
   scrollContainer: {

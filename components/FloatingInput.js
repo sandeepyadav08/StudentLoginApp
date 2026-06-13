@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, TextInput, Animated, StyleSheet, Text } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useTheme } from '../contexts/ThemeContext';
 
 export default function FloatingInput({
   label, icon, value, onChangeText,
   secureTextEntry, keyboardType = 'default',
   error, editable = true, rightIcon,
 }) {
+  const { colors, isDark } = useTheme();
   const [focused, setFocused] = useState(false);
   const anim = useRef(new Animated.Value(value ? 1 : 0)).current;
 
@@ -18,21 +20,18 @@ export default function FloatingInput({
     }).start();
   }, [focused, value]);
 
-  // Label positioned relative to container (not inside box)
-  // Android does not support overflow:visible so label must be a sibling of the box
   const labelTop   = anim.interpolate({ inputRange: [0, 1], outputRange: [24, 1] });
   const labelSize  = anim.interpolate({ inputRange: [0, 1], outputRange: [15, 11] });
   const labelColor = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: [error ? '#EF4444' : '#A0AEC0', error ? '#EF4444' : '#6C63FF'],
+    outputRange: [error ? '#EF4444' : colors.textTertiary, error ? '#EF4444' : colors.primary],
   });
 
-  const bgColor     = error ? '#FFF5F5' : '#FAFAFA';
-  const borderColor = error ? '#EF4444' : focused ? '#6C63FF' : '#E2E8F0';
+  const bgColor     = error ? (isDark ? '#3B1E1E' : '#FFF5F5') : colors.input;
+  const borderColor = error ? '#EF4444' : focused ? colors.primary : colors.inputBorder;
 
   return (
     <View style={s.outer}>
-      {/* Wrapper gives space for floating label above box */}
       <View style={s.container}>
         <Animated.Text
           style={[s.label, {
@@ -50,11 +49,11 @@ export default function FloatingInput({
             <Ionicons
               name={icon}
               size={18}
-              color={error ? '#EF4444' : focused ? '#6C63FF' : '#A0AEC0'}
+              color={error ? '#EF4444' : focused ? colors.primary : colors.textTertiary}
             />
           </View>
           <TextInput
-            style={s.input}
+            style={[s.input, { color: colors.text }]}
             value={value}
             onChangeText={onChangeText}
             onFocus={() => setFocused(true)}
@@ -78,7 +77,7 @@ const s = StyleSheet.create({
   outer: { marginBottom: 6 },
   container: {
     position: 'relative',
-    paddingTop: 10,   // space for label to float into
+    paddingTop: 10,
   },
   label: {
     position: 'absolute',
@@ -99,7 +98,6 @@ const s = StyleSheet.create({
   input: {
     flex: 1,
     fontSize: 15,
-    color: '#1A202C',
     paddingLeft: 8,
     paddingVertical: 0,
     height: '100%',
