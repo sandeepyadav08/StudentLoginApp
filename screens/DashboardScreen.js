@@ -143,7 +143,10 @@ export default function DashboardScreen({ navigation }) {
           styles.statCardWrapper,
           {
             padding: pad,
-            backgroundColor: isDark ? `${color.icon}22` : color.bg,
+            backgroundColor: isDark ? `${color.icon}18` : color.bg,
+            elevation: isDark ? 0 : 4,
+            borderWidth: isDark ? 1 : 0,
+            borderColor: isDark ? `${color.icon}50` : 'transparent',
           },
         ]}
       >
@@ -292,6 +295,7 @@ export default function DashboardScreen({ navigation }) {
                 backgroundColor: '#6C63FF',
                 margin: getResponsivePadding(16, screenWidth),
                 padding: getResponsivePadding(20, screenWidth),
+                elevation: isDark ? 0 : 8,
               },
             ]}
           >
@@ -373,7 +377,8 @@ export default function DashboardScreen({ navigation }) {
                 backgroundColor: colors.surface,
                 marginHorizontal: getResponsivePadding(16, screenWidth),
                 padding: getResponsivePadding(16, screenWidth),
-                maxHeight: screenHeight * 0.3, // Limit height to 30% of screen
+                maxHeight: screenHeight * 0.3,
+                elevation: isDark ? 0 : 5,
               },
             ]}
           >
@@ -507,7 +512,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
     shadowRadius: 16,
-    elevation: 8,
   },
   welcomeTitle: {
     fontSize: 20,
@@ -533,7 +537,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.10,
     shadowRadius: 10,
-    elevation: 4,
     overflow: 'hidden',
   },
   statCardOverlay: {
@@ -568,7 +571,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.10,
     shadowRadius: 14,
-    elevation: 5,
   },
   sectionHeader: {
     flexDirection: "row",
