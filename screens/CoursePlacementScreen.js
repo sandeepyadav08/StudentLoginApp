@@ -66,9 +66,11 @@ export default function CoursePlacementScreen({ navigation }) {
             try {
               let subUtilityDetails;
               if (typeof course.sub_utility_details === "string") {
-                subUtilityDetails = JSON.parse(course.sub_utility_details);
+                subUtilityDetails = course.sub_utility_details.trim()
+                  ? JSON.parse(course.sub_utility_details)
+                  : [];
               } else {
-                subUtilityDetails = course.sub_utility_details;
+                subUtilityDetails = course.sub_utility_details || [];
               }
 
               // Handle both object and array formats

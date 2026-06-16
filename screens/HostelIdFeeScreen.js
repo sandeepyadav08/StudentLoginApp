@@ -63,9 +63,11 @@ export default function HostelIdFeeScreen({ navigation }) {
             try {
               let subUtilityDetails;
               if (typeof hostel.sub_utility_details === "string") {
-                subUtilityDetails = JSON.parse(hostel.sub_utility_details);
+                subUtilityDetails = hostel.sub_utility_details.trim()
+                  ? JSON.parse(hostel.sub_utility_details)
+                  : [];
               } else {
-                subUtilityDetails = hostel.sub_utility_details;
+                subUtilityDetails = hostel.sub_utility_details || [];
               }
 
               // Handle both object and array formats

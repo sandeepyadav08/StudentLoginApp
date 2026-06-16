@@ -595,9 +595,11 @@ export default function SubscribeMembershipScreen({ navigation }) {
           try {
             let subUtilityDetails;
             if (typeof utility.sub_utility_details === "string") {
-              subUtilityDetails = JSON.parse(utility.sub_utility_details);
+              subUtilityDetails = utility.sub_utility_details.trim()
+                ? JSON.parse(utility.sub_utility_details)
+                : [];
             } else {
-              subUtilityDetails = utility.sub_utility_details;
+              subUtilityDetails = utility.sub_utility_details || [];
             }
 
             // Handle both object and array formats

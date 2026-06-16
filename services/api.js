@@ -45,7 +45,9 @@ export const getDashboardData = async () => {
     if (data.res && Array.isArray(data.res)) {
       data.res.forEach((item, index) => {
         try {
-          const utilityDetails = JSON.parse(item.utility_details);
+          const utilityDetails = item.utility_details && item.utility_details.trim()
+            ? JSON.parse(item.utility_details)
+            : {};
           subscriptions[index] = {
             id: item.id,
             name: item.name,
