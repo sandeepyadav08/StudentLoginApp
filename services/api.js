@@ -1,14 +1,112 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
+import { resetToLogin } from "../navigators/navigationRef";
 
 const API_BASE_URL = "https://students.dhavalhost.com/api/portal/";
 
+const ACCESS_TOKEN_KEY = "userToken";
+const REFRESH_TOKEN_KEY = "refreshToken";
+
 const getAuthToken = async () => {
   try {
-    return await AsyncStorage.getItem("userToken");
+    return await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
   } catch (error) {
     console.error("Error getting auth token:", error);
     return null;
   }
+};
+
+const getRefreshToken = async () => {
+  try {
+    return await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+  } catch (error) {
+    console.error("Error getting refresh token:", error);
+    return null;
+  }
+};
+
+const saveTokens = async (accessToken, refreshToken) => {
+  if (accessToken) await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, accessToken);
+  if (refreshToken) await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, refreshToken);
+};
+
+const clearSession = async () => {
+  await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+  await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+  await AsyncStorage.multiRemove(["userEmail", "userData"]);
+};
+
+// Ensures concurrent 401s trigger only one /refresh-token call, not one per request
+let refreshingPromise = null;
+
+const refreshAccessToken = async () => {
+  if (refreshingPromise) return refreshingPromise;
+
+  refreshingPromise = (async () => {
+    try {
+      const refreshToken = await getRefreshToken();
+      if (!refreshToken) throw new Error("No refresh token available");
+
+      const formData = new FormData();
+      formData.append("refresh_token", refreshToken);
+
+      const response = await fetch(`${API_BASE_URL}/refresh-token`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json();
+
+      if (data.status !== 200 || !data._Token) {
+        throw new Error(data.message || "Session expired");
+      }
+
+      await saveTokens(data._Token, data.refresh_token);
+      return data._Token;
+    } catch (error) {
+      console.error("Token refresh failed:", error);
+      await clearSession();
+      resetToLogin();
+      throw error;
+    } finally {
+      refreshingPromise = null;
+    }
+  })();
+
+  return refreshingPromise;
+};
+
+// Drop-in replacement for fetch() on authenticated endpoints: attaches the
+// bearer token, and if the API reports an expired/invalid token
+// (HTTP 200 with `status: 401` in the body — this backend never uses real
+// HTTP error codes), silently refreshes and retries the request once.
+const authorizedFetch = async (url, options = {}, token) => {
+  const doFetch = async (authToken) =>
+    fetch(url, {
+      ...options,
+      headers: { ...options.headers, Authorization: `Bearer ${authToken}` },
+    });
+
+  let currentToken = token || (await getAuthToken());
+  let response = await doFetch(currentToken);
+
+  let peeked;
+  try {
+    peeked = await response.clone().json();
+  } catch {
+    return response; // not JSON (e.g. HTML/binary) - nothing to detect
+  }
+
+  if (peeked && peeked.status === 401) {
+    try {
+      const newToken = await refreshAccessToken();
+      response = await doFetch(newToken);
+    } catch {
+      // refreshAccessToken already cleared the session and redirected to Login;
+      // return the original 401 response so the caller's existing error handling fires
+    }
+  }
+
+  return response;
 };
 
 const formatDateDisplay = (dateString) => {
@@ -27,14 +125,15 @@ export const getDashboardData = async () => {
     const token = await getAuthToken();
     if (!token) throw new Error("Authentication token not found");
 
-    const response = await fetch(`${API_BASE_URL}/active-membership`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/active-membership`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
       },
-      body: JSON.stringify({}),
-    });
+      token
+    );
 
     if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
@@ -195,13 +294,14 @@ export const testApiConnection = async () => {
 // Read User API
 export const readUserAPI = async (token) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/read-user`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/read-user`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
       },
-    });
+      token
+    );
 
     const data = await response.json();
 
@@ -229,13 +329,14 @@ export const readUserAPI = async (token) => {
 // Get Categories API (Generic - returns both grievance and helpdesk)
 export const getCategoriesAPI = async (token) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/get-category`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/get-category`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
       },
-    });
+      token
+    );
 
     const data = await response.json();
 
@@ -263,15 +364,13 @@ export const getCategoriesAPI = async (token) => {
 // Get Grievance Categories API
 export const getGrievanceCategoriesAPI = async (token) => {
   try {
-    const response = await fetch(
+    const response = await authorizedFetch(
       `${API_BASE_URL}/get-category?page=grievance`,
       {
         method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      }
+        headers: { "Content-Type": "application/json" },
+      },
+      token
     );
 
     const data = await response.json();
@@ -300,13 +399,14 @@ export const getGrievanceCategoriesAPI = async (token) => {
 // Get Helpdesk Categories API
 export const getHelpdeskCategoriesAPI = async (token) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/get-category?page=helpdesk`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/get-category?page=helpdesk`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
       },
-    });
+      token
+    );
 
     const data = await response.json();
 
@@ -375,13 +475,14 @@ export const saveGrievanceAPI = async (grievanceData, token) => {
 
     console.log("hbhbhjbhj", formData);
 
-    const response = await fetch(`${API_BASE_URL}/save-query`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/save-query`,
+      {
+        method: "POST",
+        body: formData,
       },
-      body: formData,
-    });
+      token
+    );
 
     // Handle non-JSON responses first
     const responseText = await response.text();
@@ -470,13 +571,14 @@ export const saveHelpdeskAPI = async (ticketData, token) => {
 
     console.log(formData);
 
-    const response = await fetch(`${API_BASE_URL}/save-tickets`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/save-tickets`,
+      {
+        method: "POST",
+        body: formData,
       },
-      body: formData,
-    });
+      token
+    );
 
     // Handle non-JSON responses first
     const responseText = await response.text();
@@ -542,6 +644,7 @@ export const loginAPI = async (email, password) => {
         return {
           success: true,
           token: data._Token,
+          refreshToken: data.refresh_token,
           message: data.message,
           user: {
             email: email,
@@ -810,13 +913,14 @@ export const getPaymentHistoryAPI = async (
   formData.append("length", length);
 
   try {
-    const response = await fetch(`${API_BASE_URL}/payment-history`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/payment-history`,
+      {
+        method: "POST",
+        body: formData,
       },
-      body: formData,
-    });
+      token
+    );
 
     const text = await response.text();
     let data;
@@ -878,14 +982,15 @@ export const getPaymentHistoryAPI = async (
 // Get Dashboard Data API (includes utility list and term buttons)
 export const getDashboardDataAPI = async (token) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/dashboard`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/dashboard`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
       },
-      body: JSON.stringify({}),
-    });
+      token
+    );
 
     const text = await response.text();
     let data;
@@ -933,13 +1038,14 @@ export const getUtilityAmountAPI = async (
   if (utilityId) formData.append("id", utilityId);
 
   try {
-    const response = await fetch(`${API_BASE_URL}/get-utility-amount`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/get-utility-amount`,
+      {
+        method: "POST",
+        body: formData,
       },
-      body: formData,
-    });
+      token
+    );
 
     const text = await response.text();
     let data;
@@ -974,13 +1080,14 @@ export const getPaymentDetailsAPI = async (token, paymentId) => {
   formData.append("id", paymentId);
 
   try {
-    const response = await fetch(`${API_BASE_URL}/get-utility-detail`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/get-utility-detail`,
+      {
+        method: "POST",
+        body: formData,
       },
-      body: formData,
-    });
+      token
+    );
 
     const text = await response.text();
     let data;
@@ -1091,14 +1198,15 @@ export const uploadFileAPI = async (fileData, token) => {
       token?.substring(0, 20) + "..."
     );
 
-    const response = await fetch(`${API_BASE_URL}/upload-file`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/upload-file`,
+      {
+        method: "POST",
         // Don't set Content-Type header - let browser handle it for multipart/form-data
+        body: formData,
       },
-      body: formData,
-    });
+      token
+    );
 
     console.log("Upload response status:", response.status);
     console.log("Upload response ok:", response.ok);
@@ -1152,13 +1260,14 @@ export const deleteFileAPI = async (filename, token) => {
     console.log("Deleting file:", filename);
     console.log("Delete API endpoint:", `${API_BASE_URL}/delete-file`);
 
-    const response = await fetch(`${API_BASE_URL}/delete-file`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/delete-file`,
+      {
+        method: "POST",
+        body: formData,
       },
-      body: formData,
-    });
+      token
+    );
 
     const responseText = await response.text();
     console.log("Delete API response text:", responseText);
@@ -1346,14 +1455,15 @@ export const saveUtilityRequestAPI = async (utilityData, token) => {
     console.log("Original utility data received:", utilityData);
     console.log("Formatted request data for backend:", requestData);
 
-    const response = await fetch(`${API_BASE_URL}/save-utility-request`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/save-utility-request`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(requestData),
       },
-      body: JSON.stringify(requestData),
-    });
+      token
+    );
 
     const responseText = await response.text();
     let data;
@@ -1475,13 +1585,14 @@ export const saveTicketAPI = async (ticketData, token) => {
       console.log(`${key}: ${value}`);
     }
 
-    const response = await fetch(`${API_BASE_URL}/save-tickets`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/save-tickets`,
+      {
+        method: "POST",
+        body: formData,
       },
-      body: formData,
-    });
+      token
+    );
 
     const responseText = await response.text();
     let data;
@@ -1514,13 +1625,14 @@ export const saveTicketAPI = async (ticketData, token) => {
 // Get Grievances API
 export const getGrievancesAPI = async (token, page = 0, limit = 10) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/grievance-list`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/grievance-list`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
       },
-    });
+      token
+    );
 
     const responseText = await response.text();
     let data;
@@ -1594,13 +1706,14 @@ export const getGrievancesAPI = async (token, page = 0, limit = 10) => {
 // Get Helpdesk Tickets API
 export const getHelpdeskTicketsAPI = async (token, page = 0, limit = 10) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/helpdesk-list`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/helpdesk-list`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
       },
-    });
+      token
+    );
 
     const responseText = await response.text();
     let data;
@@ -1677,13 +1790,14 @@ export const getHelpdeskTicketsAPI = async (token, page = 0, limit = 10) => {
 // Get Course & Placement Fee API
 export const getCourseAndPlacementFeeAPI = async (token) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/course-n-placement-fee`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/course-n-placement-fee`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
       },
-    });
+      token
+    );
 
     const responseText = await response.text();
     let data;
@@ -1719,13 +1833,14 @@ export const getCourseAndPlacementFeeAPI = async (token) => {
 // Get Hostel & ID Fee API
 export const getHostelAndIdFeeAPI = async (token) => {
   try {
-    const response = await fetch(`${API_BASE_URL}/hostel-n-id-fee`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    const response = await authorizedFetch(
+      `${API_BASE_URL}/hostel-n-id-fee`,
+      {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
       },
-    });
+      token
+    );
 
     const responseText = await response.text();
     let data;

@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { loginAPI } from '../services/api';
 import FloatingInput from '../components/FloatingInput';
 import { useTheme } from '../contexts/ThemeContext';
@@ -111,7 +112,8 @@ export default function LoginScreen({ navigation }) {
           Alert.alert('Login Failed', res.message, [{ text: 'OK', onPress: () => setLoading(false) }]);
           return;
         }
-        await AsyncStorage.setItem('userToken', res.token);
+        await SecureStore.setItemAsync('userToken', res.token);
+        if (res.refreshToken) await SecureStore.setItemAsync('refreshToken', res.refreshToken);
         await AsyncStorage.setItem('userEmail', email.trim());
         if (res.user) await AsyncStorage.setItem('userData', JSON.stringify(res.user));
         if (rememberMe) await AsyncStorage.setItem('rememberedEmail', email.trim());

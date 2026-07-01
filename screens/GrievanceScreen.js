@@ -17,6 +17,7 @@ import {
 } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { getGrievancesAPI, getCategoriesAPI } from '../services/api';
 import GrievanceFormScreen from './GrievanceFormScreen';
 import { useTheme } from '../contexts/ThemeContext';
@@ -41,7 +42,7 @@ const GrievanceScreen = ({ navigation }) => {
   const loadGrievances = async () => {
     try {
       setError(null);
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       if (!token) {
         Alert.alert(
           'Error',
@@ -66,7 +67,7 @@ const GrievanceScreen = ({ navigation }) => {
 
   const loadCategories = async () => {
     try {
-      const token = await AsyncStorage.getItem('userToken');
+      const token = await SecureStore.getItemAsync('userToken');
       if (!token) return;
 
       const response = await getCategoriesAPI(token);

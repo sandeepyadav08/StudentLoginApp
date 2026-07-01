@@ -18,6 +18,7 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { Picker } from "@react-native-picker/picker";
 import { getPaymentHistoryAPI, getPaymentDetailsAPI } from "../services/api";
 import { WebView } from "react-native-webview";
@@ -84,7 +85,7 @@ export default function PaymentHistoryScreen({ navigation }) {
       setError(null);
       if (showFullLoader) setLoading(true);
       setFilterLoading(true);
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await SecureStore.getItemAsync("userToken");
 
       if (!token) {
         Alert.alert("Error", "No authentication token found");
@@ -136,7 +137,7 @@ export default function PaymentHistoryScreen({ navigation }) {
   const loadPaymentDetails = async (paymentId) => {
     try {
       setDetailsLoading(true);
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await SecureStore.getItemAsync("userToken");
 
       if (!token) {
         Alert.alert("Error", "No authentication token found");

@@ -16,6 +16,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import * as DocumentPicker from "expo-document-picker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import {
   uploadFileAPI,
   deleteFileAPI,
@@ -77,7 +78,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
   const loadCategories = async () => {
     try {
       setIsLoadingCategories(true);
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await SecureStore.getItemAsync("userToken");
       if (!token) {
         Alert.alert("Error", "Authentication token not found. Please login again.");
         navigation.goBack();
@@ -206,7 +207,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
     try {
       setIsUploading(true);
       setUploadProgress(0);
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await SecureStore.getItemAsync("userToken");
       if (!token) {
         Alert.alert("Error", "Authentication token not found. Please login again.");
         return;
@@ -249,7 +250,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
   const deleteFileFromServer = async () => {
     try {
       setIsDeleting(true);
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await SecureStore.getItemAsync("userToken");
       if (!token) {
         Alert.alert("Error", "Authentication token not found. Please login again.");
         return;
@@ -287,7 +288,7 @@ const HelpdeskFormScreen = ({ navigation }) => {
     }
     try {
       setIsSubmitting(true);
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await SecureStore.getItemAsync("userToken");
       if (!token) {
         Alert.alert("Error", "Authentication token not found. Please login again.");
         return;

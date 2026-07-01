@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Platform, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import DashboardScreen from "../screens/DashboardScreen";
@@ -28,12 +29,13 @@ const BottomTabNavigator = () => {
         style: "destructive",
         onPress: async () => {
           try {
-            const token = await AsyncStorage.getItem("userToken");
+            const token = await SecureStore.getItemAsync("userToken");
             if (token) await logoutAPI(token);
           } catch (error) {
             console.log("Logout API error:", error);
           }
-          await AsyncStorage.removeItem("userToken");
+          await SecureStore.deleteItemAsync("userToken");
+          await SecureStore.deleteItemAsync("refreshToken");
           await AsyncStorage.removeItem("userEmail");
           navigation.replace("Login");
         },

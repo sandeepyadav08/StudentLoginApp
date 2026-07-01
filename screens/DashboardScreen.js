@@ -14,6 +14,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { getDashboardData, readUserAPI } from "../services/api";
 import { useTheme } from "../contexts/ThemeContext";
 import ScreenWrapper from '../components/ScreenWrapper';
@@ -63,7 +64,7 @@ export default function DashboardScreen({ navigation }) {
 
   const loadUserData = async () => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await SecureStore.getItemAsync("userToken");
       const storedEmail = await AsyncStorage.getItem("userEmail");
       if (storedEmail) setUserEmail(storedEmail);
       if (token) {

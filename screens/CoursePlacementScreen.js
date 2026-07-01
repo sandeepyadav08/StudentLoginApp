@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { useTheme } from "../contexts/ThemeContext";
 import ScreenWrapper from '../components/ScreenWrapper';
 import {
@@ -49,7 +50,7 @@ export default function CoursePlacementScreen({ navigation }) {
       setLoading(true);
       setError(null);
 
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await SecureStore.getItemAsync("userToken");
       if (!token) {
         throw new Error("Authentication token not found");
       }
@@ -208,7 +209,7 @@ export default function CoursePlacementScreen({ navigation }) {
     try {
       let token;
       try {
-        token = await AsyncStorage.getItem("userToken");
+        token = await SecureStore.getItemAsync("userToken");
       } catch (storageError) {
         console.error("AsyncStorage error:", storageError);
         Alert.alert(
@@ -281,7 +282,7 @@ export default function CoursePlacementScreen({ navigation }) {
     try {
       let token;
       try {
-        token = await AsyncStorage.getItem("userToken");
+        token = await SecureStore.getItemAsync("userToken");
       } catch (storageError) {
         console.error("AsyncStorage error:", storageError);
         Alert.alert(

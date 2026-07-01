@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { readUserAPI, getCategoriesAPI, saveGrievanceAPI } from "../services/api";
 import { useTheme } from "../contexts/ThemeContext";
 
@@ -67,7 +68,7 @@ const GrievanceFormScreen = ({ navigation }) => {
   const loadUserData = async () => {
     try {
       setIsLoadingUserData(true);
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await SecureStore.getItemAsync("userToken");
       if (!token) {
         Alert.alert("Error", "Authentication token not found. Please login again.");
         navigation.goBack();
@@ -91,7 +92,7 @@ const GrievanceFormScreen = ({ navigation }) => {
   const loadCategories = async () => {
     try {
       setIsLoadingCategories(true);
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await SecureStore.getItemAsync("userToken");
       if (!token) {
         Alert.alert("Error", "Authentication token not found. Please login again.");
         navigation.goBack();
@@ -172,7 +173,7 @@ const GrievanceFormScreen = ({ navigation }) => {
     if (!validateForm()) return;
     setIsSubmitting(true);
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await SecureStore.getItemAsync("userToken");
       if (!token) {
         Alert.alert("Error", "Authentication token not found. Please login again.");
         return;

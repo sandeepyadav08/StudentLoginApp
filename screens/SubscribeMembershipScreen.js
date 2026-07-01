@@ -16,6 +16,7 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 import { useTheme } from "../contexts/ThemeContext";
 import ScreenWrapper from '../components/ScreenWrapper';
 import {
@@ -166,7 +167,7 @@ export default function SubscribeMembershipScreen({ navigation }) {
     endDate = null
   ) => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await SecureStore.getItemAsync("userToken");
       if (!token) {
         throw new Error("Authentication token not found");
       }
@@ -406,7 +407,7 @@ export default function SubscribeMembershipScreen({ navigation }) {
     try {
       let token;
       try {
-        token = await AsyncStorage.getItem("userToken");
+        token = await SecureStore.getItemAsync("userToken");
       } catch (storageError) {
         console.error("AsyncStorage error:", storageError);
         Alert.alert(
@@ -481,7 +482,7 @@ export default function SubscribeMembershipScreen({ navigation }) {
     try {
       let token;
       try {
-        token = await AsyncStorage.getItem("userToken");
+        token = await SecureStore.getItemAsync("userToken");
       } catch (storageError) {
         console.error("AsyncStorage error:", storageError);
         Alert.alert(
@@ -581,7 +582,7 @@ export default function SubscribeMembershipScreen({ navigation }) {
 
   const fetchUtilities = async () => {
     try {
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await SecureStore.getItemAsync("userToken");
       const response = await getDashboardDataAPI(token);
 
       if (response.success && response.data && response.data.utility_list) {

@@ -8,6 +8,7 @@ import { createStackNavigator } from "@react-navigation/stack";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar, Platform, useColorScheme } from "react-native";
 import { ThemeProvider, useTheme } from "./contexts/ThemeContext";
+import { navigationRef } from "./navigators/navigationRef";
 import ErrorBoundary from "./components/ErrorBoundary";
 import LoginScreen from "./screens/LoginScreen";
 import ForgotPasswordScreen from "./screens/ForgotPasswordScreen";
@@ -55,7 +56,7 @@ function AppNavigator() {
         backgroundColor={Platform.OS === 'android' ? colors.background : undefined}
         translucent={false}
       />
-      <NavigationContainer theme={navigationTheme}>
+      <NavigationContainer ref={navigationRef} theme={navigationTheme}>
         <Stack.Navigator
         initialRouteName="Login"
         screenOptions={{
