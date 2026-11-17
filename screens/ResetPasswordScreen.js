@@ -3,7 +3,6 @@ import {
   StyleSheet, Text, View, TouchableOpacity, Alert,
   ScrollView, Dimensions, KeyboardAvoidingView, Platform,
   Animated, ActivityIndicator, TouchableWithoutFeedback, Keyboard,
-  InteractionManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -54,7 +53,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
       ]);
     }
 
-    const task = InteractionManager.runAfterInteractions(() => {
+    const task = requestIdleCallback(() => {
       Animated.parallel([
         Animated.spring(iconScale,   { toValue: 1, tension: 55, friction: 7, useNativeDriver: true }),
         Animated.timing(cardY,       { toValue: 0, duration: 600, delay: 100, useNativeDriver: isIOS }),
@@ -72,7 +71,7 @@ export default function ResetPasswordScreen({ navigation, route }) {
       loop(orb1Y, 4000);
       loop(orb2Y, 3500, 900);
     });
-    return () => task.cancel();
+    return () => cancelIdleCallback(task);
   }, []);
 
   useEffect(() => {

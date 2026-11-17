@@ -3,7 +3,6 @@ import {
   StyleSheet, Text, View, TouchableOpacity, Alert,
   ScrollView, Dimensions, KeyboardAvoidingView, Platform,
   Animated, ActivityIndicator, TouchableWithoutFeedback, Keyboard,
-  InteractionManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -34,7 +33,7 @@ export default function ForgotPasswordScreen({ navigation }) {
   const shakeX      = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const task = InteractionManager.runAfterInteractions(() => {
+    const task = requestIdleCallback(() => {
       Animated.parallel([
         Animated.spring(iconScale,   { toValue: 1, tension: 55, friction: 7, useNativeDriver: true }),
         Animated.timing(iconOpacity, { toValue: 1, duration: 400, useNativeDriver: true }),
@@ -43,7 +42,7 @@ export default function ForgotPasswordScreen({ navigation }) {
         Animated.timing(cardElev,    { toValue: 1, duration: 550, delay: 100, useNativeDriver: false }),
       ]).start(() => setEntered(true));
     });
-    return () => task.cancel();
+    return () => cancelIdleCallback(task);
   }, []);
 
   const shakeCard = () => {
